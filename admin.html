@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administration - BOTAKI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --navy-deep: #131c42;
+            --navy: #1e2f6b;
+            --gold: #f4b400;
+            --gold-light: #ffd54f;
+            --ink: #f5f6fb;
+        }
+        body {
+            margin: 0; font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--navy-deep), var(--navy));
+            color: var(--ink); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px;
+        }
+        .admin-container { max-width: 600px; width: 100%; }
+        .card {
+            background: rgba(255,255,255,0.06); backdrop-filter: blur(8px);
+            border: 1px solid rgba(244,180,0,0.2); border-radius: 20px; padding: 24px; margin-bottom: 20px;
+        }
+        h2 { color: var(--gold-light); margin: 0 0 16px; }
+        input[type="file"] { width: 100%; padding: 10px; border-radius: 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(244,180,0,0.3); color: white; margin-bottom: 12px; }
+        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; }
+        .btn {
+            padding: 10px 20px; border-radius: 12px; font-weight: 600; font-size: 0.9rem; cursor: pointer; border: none; transition: 0.2s;
+        }
+        .btn-gold { background: var(--gold); color: var(--navy-deep); }
+        .btn-gold:hover { background: var(--gold-light); }
+        .btn-outline { background: transparent; border: 1px solid rgba(244,180,0,0.4); color: var(--gold-light); }
+        .btn-outline:hover { background: rgba(244,180,0,0.1); }
+        .message { padding: 8px 12px; border-radius: 8px; margin-top: 10px; font-size: 0.9rem; display: none; }
+        .message.success { background: rgba(16,185,129,0.2); color: #10b981; display: block; }
+        .message.error { background: rgba(239,68,68,0.2); color: #ef4444; display: block; }
+        #login-message { text-align: center; margin-bottom: 16px; }
+        input[type="password"] {
+            width: 100%; padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(244,180,0,0.3); color: white; margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+<div class="admin-container" id="login-block">
+    <div class="card" style="text-align: center;">
+        <h2>🔐 Administration BOTAKI</h2>
+        <p style="margin-bottom: 20px;">Mot de passe requis</p>
+        <input type="password" id="passwordInput" placeholder="Mot de passe">
+        <button class="btn btn-gold" id="loginBtn">Valider</button>
+        <div id="login-message" class="message"></div>
+    </div>
+</div>
+
+<div class="admin-container" id="admin-content" style="display: none;">
+    <div class="card">
+        <h2>📚 Base articles (database.xlsx)</h2>
+        <input type="file" id="databaseFile" accept=".xlsx, .xls">
+        <div class="btn-group">
+            <button class="btn btn-gold" id="dbReplaceBtn">Remplacer</button>
+            <button class="btn btn-outline" id="dbAppendBtn">Ajouter des produits</button>
+        </div>
+        <div id="db-message" class="message"></div>
+    </div>
+
+    <div class="card">
+        <h2>📋 Cadenceur (CADENCIER.xlsx)</h2>
+        <input type="file" id="cadencierFile" accept=".xlsx, .xls">
+        <div class="btn-group">
+            <button class="btn btn-gold" id="cadReplaceBtn">Remplacer</button>
+            <button class="btn btn-outline" id="cadAppendBtn">Ajouter des produits</button>
+        </div>
+        <div id="cad-message" class="message"></div>
+    </div>
+
+    <div class="card">
+        <h2>🗑️ Nettoyage des inventaires</h2>
+        <p style="font-size:0.85rem; color:#a9b3d6; margin: 0 0 14px;">
+            Supprime automatiquement tous les inventaires de plus de <strong style="color:var(--gold-light)">3 jours</strong>
+            dans les dossiers Épicerie, BAZARD et Boisson.<br>
+            Ce nettoyage s'exécute aussi chaque nuit à 1h00 automatiquement.
+        </p>
+        <div class="btn-group">
+            <button class="btn btn-gold" id="cleanupBtn">🚀 Lancer le nettoyage maintenant</button>
+        </div>
+        <div id="cleanup-message" class="message"></div>
+    </div>
+</div>
+
+<script>
+    // Authentification via sessionStorage (mot de passe demandé à chaque nouvelle session)
+    if (sessionStorage.getItem('adminAuthenticated') === 'true') showAdmin();
+
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+        const password = document.getElementById('passwordInput').value;
+        const msgEl = document.getElementById('login-message');
+        try {
+            const resp = await fetch('/api/check-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                sessionStorage.setItem('adminAuthenticated', 'true');
+                showAdmin();
+            } else {
+                msgEl.className = 'message error';
+                msgEl.textContent = 'Mot de passe incorrect.';
+            }
+        } catch(e) {
+            msgEl.className = 'message error';
+            msgEl.textContent = 'Erreur réseau.';
+        }
+    });
+
+    function showAdmin() {
+        document.getElementById('login-block').style.display = 'none';
+        document.getElementById('admin-content').style.display = 'block';
+    }
+
+    // Conversion ArrayBuffer -> base64 (robuste)
+    function arrayBufferToBase64(buffer) {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary);
+    }
+
+    // Fonction générique d'upload (appelée par les 4 boutons)
+    async function uploadFile(type, mode) {
+        const fileInput = document.getElementById(type === 'database' ? 'databaseFile' : 'cadencierFile');
+        const msgEl = document.getElementById(type === 'database' ? 'db-message' : 'cad-message');
+        const file = fileInput.files[0];
+
+        if (!file) {
+            msgEl.className = 'message error';
+            msgEl.textContent = 'Veuillez sélectionner un fichier.';
+            return;
+        }
+
+        msgEl.className = 'message';
+        msgEl.textContent = 'Envoi en cours...';
+        msgEl.style.display = 'block';
+
+        try {
+            const buffer = await file.arrayBuffer();
+            const base64 = arrayBufferToBase64(buffer);
+
+            const resp = await fetch('/api/upload-base', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    fileBase64: base64,
+                    fileName: type === 'database' ? 'database.xlsx' : 'CADENCIER.xlsx',
+                    mode: mode
+                })
+            });
+
+            const text = await resp.text();
+            let result;
+            try {
+                result = JSON.parse(text);
+            } catch {
+                throw new Error('Réponse inattendue du serveur');
+            }
+
+            if (resp.ok && result.success) {
+                let msg = '';
+                if (mode === 'replace') {
+                    msg = 'Fichier remplacé avec succès !';
+                } else {
+                    const added = result.added || 0;
+                    const updated = result.updated || 0;
+                    const parts = [];
+                    if (added > 0) parts.push(`${added} produit(s) ajouté(s)`);
+                    if (updated > 0) parts.push(`${updated} mis à jour`);
+                    msg = parts.length > 0 ? parts.join(', ') + '.' : 'Aucun nouveau produit ni modification.';
+                }
+                msgEl.className = 'message success';
+                msgEl.textContent = msg;
+            } else {
+                msgEl.className = 'message error';
+                msgEl.textContent = 'Erreur API : ' + (result.error || 'inconnue');
+            }
+        } catch(err) {
+            msgEl.className = 'message error';
+            msgEl.textContent = 'Erreur : ' + err.message;
+            console.error(err);
+        }
+    }
+
+    // Attacher les événements
+    document.getElementById('dbReplaceBtn').addEventListener('click', () => uploadFile('database', 'replace'));
+    document.getElementById('dbAppendBtn').addEventListener('click', () => uploadFile('database', 'append'));
+    document.getElementById('cadReplaceBtn').addEventListener('click', () => uploadFile('cadencier', 'replace'));
+    document.getElementById('cadAppendBtn').addEventListener('click', () => uploadFile('cadencier', 'append'));
+
+    // --- Nettoyage inventaires ---
+    document.getElementById('cleanupBtn').addEventListener('click', async () => {
+        const msgEl = document.getElementById('cleanup-message');
+        const btn   = document.getElementById('cleanupBtn');
+
+        btn.disabled = true;
+        btn.textContent = '⏳ Nettoyage en cours…';
+        msgEl.className = 'message';
+        msgEl.style.display = 'block';
+        msgEl.textContent = 'Suppression des fichiers expirés sur GitHub…';
+
+        try {
+            const resp = await fetch('/api/cleanup-inventaires', { method: 'POST' });
+            const data = await resp.json();
+
+            if (data.success) {
+                const nb = data.supprimes.length;
+                const errNb = data.erreurs.length;
+                let msg = nb > 0
+                    ? `✅ ${nb} fichier(s) supprimé(s) : ${data.supprimes.join(', ')}`
+                    : '✅ Aucun fichier expiré à supprimer.';
+                if (errNb > 0) msg += ` ⚠️ ${errNb} erreur(s) : ${data.erreurs.join(', ')}`;
+                msgEl.className = 'message success';
+                msgEl.textContent = msg;
+            } else {
+                msgEl.className = 'message error';
+                msgEl.textContent = 'Erreur : ' + (data.error || 'inconnue');
+            }
+        } catch (err) {
+            msgEl.className = 'message error';
+            msgEl.textContent = 'Erreur réseau : ' + err.message;
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '🚀 Lancer le nettoyage maintenant';
+        }
+    });
+</script>
+</body>
+</html>

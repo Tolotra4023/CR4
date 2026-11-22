@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOTAKI - Édition DLV & Prix</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@14.5.0/dist/handsontable.full.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/handsontable@14.5.0/dist/handsontable.full.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --navy-deep: #131c42;
+            --navy: #1e2f6b;
+            --gold: #f4b400;
+            --gold-light: #ffd54f;
+            --ink: #f5f6fb;
+            --ink-muted: #a9b3d6;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            height: 100%;
+        }
+        body {
+            background: linear-gradient(180deg, var(--navy-deep) 0%, var(--navy) 100%);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+            height: 100%;
+            color: var(--ink);
+            padding: 0.5rem 0.75rem;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        body.fullscreen-mode {
+            padding: 0;
+            background: #fff;
+        }
+        body.fullscreen-mode .top-bar,
+        body.fullscreen-mode .info,
+        body.fullscreen-mode .color-bar {
+            background: var(--navy-deep);
+            max-width: none;
+            margin: 0;
+            border-radius: 0;
+            padding: 0.45rem 0.75rem;
+        }
+        body.fullscreen-mode .grid-wrap {
+            max-width: none;
+            border-radius: 0;
+            flex: 1;
+        }
+        .top-bar {
+            max-width: none;
+            width: 100%;
+            margin: 0 0 0.45rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .top-bar h1 {
+            font-size: 1.15rem;
+            color: var(--gold-light);
+            margin-right: auto;
+        }
+        .folder-btn, .sheet-btn, .action-btn {
+            padding: 0.45rem 0.9rem;
+            border-radius: 10px;
+            border: 1.5px solid rgba(244,180,0,0.35);
+            background: rgba(255,255,255,0.06);
+            color: var(--ink);
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: 0.15s;
+        }
+        .folder-btn.selected, .sheet-btn.selected {
+            background: linear-gradient(135deg, var(--gold), #d99a00);
+            color: var(--navy-deep);
+            border-color: var(--gold);
+        }
+        .action-btn.save {
+            background: #10b981;
+            border-color: #10b981;
+            color: white;
+        }
+        .action-btn.save:disabled { opacity: 0.5; cursor: not-allowed; }
+        .action-btn.download {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            color: white;
+        }
+        .action-btn.fullscreen {
+            background: rgba(255,255,255,0.1);
+            color: var(--gold-light);
+        }
+        .action-btn.back {
+            background: transparent;
+            color: var(--gold-light);
+        }
+        .info {
+            max-width: none;
+            width: 100%;
+            margin: 0 0 0.4rem;
+            font-size: 0.8rem;
+            color: var(--ink-muted);
+        }
+        .grid-wrap {
+            max-width: none;
+            width: 100%;
+            margin: 0;
+            flex: 1;
+            min-height: 0;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+        }
+        #hot { width: 100%; height: 100%; min-height: 300px; }
+        .status {
+            position: fixed;
+            bottom: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30,47,107,0.95);
+            color: white;
+            padding: 0.4rem 1.2rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 100;
+            pointer-events: none;
+        }
+        .status.show { opacity: 1; }
+        .overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.55);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .overlay.show { display: flex; }
+        .modal {
+            background: var(--navy);
+            border: 1px solid rgba(244,180,0,0.4);
+            border-radius: 16px;
+            padding: 1.3rem;
+            max-width: 340px;
+            width: 100%;
+            text-align: center;
+        }
+        .modal h3 { color: var(--gold-light); margin-bottom: 0.5rem; }
+        .modal p { color: var(--ink-muted); font-size: 0.85rem; margin-bottom: 1rem; }
+        .modal button {
+            padding: 0.6rem 1.2rem;
+            border-radius: 10px;
+            border: none;
+            background: var(--gold);
+            color: var(--navy-deep);
+            font-weight: 600;
+            cursor: pointer;
+            margin: 0 0.3rem;
+        }
+        .modal button.cancel {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.3);
+            color: var(--ink);
+        }
+        .color-swatch {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            margin-right: 8px;
+            border: 1px solid rgba(0,0,0,0.2);
+            vertical-align: middle;
+        }
+        .color-bar {
+            max-width: none;
+            width: 100%;
+            margin: 0 0 0.45rem;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.45rem 0.6rem;
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(244,180,0,0.25);
+            border-radius: 12px;
+        }
+        .color-bar-label { font-size: 0.75rem; color: var(--ink-muted); margin-right: 0.25rem; }
+        .color-mode {
+            padding: 0.25rem 0.55rem;
+            border-radius: 8px;
+            border: 1px solid rgba(244,180,0,0.35);
+            background: transparent;
+            color: var(--ink);
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .color-mode.active {
+            background: var(--gold);
+            color: var(--navy-deep);
+            border-color: var(--gold);
+        }
+        .color-bar-sep {
+            width: 1px; height: 18px;
+            background: rgba(255,255,255,0.2);
+            margin: 0 0.2rem;
+        }
+        .color-dot {
+            width: 26px; height: 26px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.35);
+            cursor: pointer; padding: 0;
+        }
+        .color-dot.clear {
+            background: transparent; color: var(--ink);
+            font-size: 0.75rem; border-radius: 8px;
+            width: auto; padding: 0 0.4rem;
+        }
+        .color-dot:active { transform: scale(0.92); }
+    
+        .hist-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.55);
+            z-index: 300;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .hist-overlay.show { display: flex; }
+        .hist-modal {
+            background: var(--navy);
+            border: 1px solid rgba(244,180,0,0.4);
+            border-radius: 16px;
+            padding: 1.2rem;
+            max-width: 520px;
+            width: 100%;
+            max-height: 80vh;
+            overflow: auto;
+            color: var(--ink);
+        }
+        .hist-modal h3 { color: var(--gold-light); margin-bottom: 0.35rem; font-size: 1rem; }
+        .hist-modal .sub { color: var(--ink-muted); font-size: 0.8rem; margin-bottom: 0.8rem; }
+        .hist-modal table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .hist-modal th, .hist-modal td {
+            border: 1px solid rgba(255,255,255,0.12);
+            padding: 0.4rem 0.45rem;
+            text-align: center;
+        }
+        .hist-modal th { background: rgba(244,180,0,0.15); color: var(--gold-light); }
+        .hist-modal .close-hist {
+            margin-top: 0.9rem;
+            width: 100%;
+            padding: 0.55rem;
+            border: none;
+            border-radius: 10px;
+            background: var(--gold);
+            color: var(--navy-deep);
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .hist-empty { text-align: center; color: var(--ink-muted); padding: 1rem 0; }
+    
+        .sync-banner {
+            display: none;
+            max-width: none;
+            width: 100%;
+            margin: 0 0 0.45rem;
+            padding: 0.55rem 0.8rem;
+            border-radius: 10px;
+            background: #f59e0b;
+            color: #1a1a1a;
+            font-size: 0.85rem;
+            font-weight: 600;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+        .sync-banner.show { display: flex; }
+        .sync-banner button {
+            padding: 0.35rem 0.75rem;
+            border-radius: 8px;
+            border: none;
+            background: #1e2f6b;
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <button class="action-btn back" onclick="location.href='index.html'">← Accueil</button>
+        <h1>Édition DLV & Prix</h1>
+        <button class="folder-btn" data-folder="KIBO4">KIBO4</button>
+        <button class="folder-btn" data-folder="KIBO2">KIBO2</button>
+        <button class="action-btn download" id="downloadBtn" title="Télécharger Excel">⬇️ Télécharger</button>
+        <button class="action-btn download" id="downloadHistBtn" title="Télécharger l'historique promo">⬇️ Historique</button>
+        <button class="action-btn" id="colorSimilarBtn" title="Colorer en rouge les produits présents dans Épicerie et Boisson" style="background:#ef4444;border-color:#ef4444;color:white;">🔴 Doublons E/B</button>
+        <button class="action-btn fullscreen" id="fullscreenBtn" title="Plein écran">⛶ Plein écran</button>
+        <button class="action-btn save" id="saveBtn" disabled>💾 Enregistrer</button>
+    </div>
+
+    <div class="top-bar" style="margin-top:0;">
+        <button class="sheet-btn selected" data-sheet="Épicerie">Épicerie</button>
+        <button class="sheet-btn" data-sheet="Boisson">Boisson</button>
+        <button class="sheet-btn" data-sheet="DPH">DPH</button>
+    </div>
+
+    <div class="sync-banner" id="syncBanner">
+        <span id="syncBannerText">Un autre utilisateur a mis à jour le fichier.</span>
+        <button type="button" id="syncReloadBtn">Actualiser</button>
+    </div>
+
+    <div class="info" id="infoBar">Sélectionnez un dossier. Utilisez la barre de couleurs ou le clic droit.</div>
+
+    <div class="color-bar" id="colorBar">
+        <span class="color-bar-label">Couleur :</span>
+        <button type="button" class="color-mode active" data-mode="cell">Cellule</button>
+        <button type="button" class="color-mode" data-mode="row">Ligne</button>
+        <span class="color-bar-sep"></span>
+        <button type="button" class="color-dot clear" data-hex="" title="Enlever">✖</button>
+    </div>
+
+    <div class="grid-wrap">
+        <div id="hot"></div>
+    </div>
+
+    <div class="status" id="status">—</div>
+
+    <div class="hist-overlay" id="histOverlay">
+        <div class="hist-modal">
+            <h3 id="histTitle">Historique</h3>
+            <div class="sub" id="histSub"></div>
+            <div id="histBody"></div>
+            <div style="display:flex;gap:0.5rem;margin-top:0.9rem;">
+                <button type="button" class="close-hist" id="histDownload" style="margin-top:0;background:#3b82f6;color:#fff;">⬇️ Télécharger</button>
+                <button type="button" class="close-hist" id="histClose" style="margin-top:0;">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay">
+        <div class="modal">
+            <h3 id="modalTitle">Confirmation</h3>
+            <p id="modalMsg"></p>
+            <button id="modalOk">OK</button>
+            <button class="cancel" id="modalCancel">Annuler</button>
+        </div>
+    </div>
+
+<script>
+(function () {
+    const API = '/api/dlv-prix';
+    const COLS = ['Code Article', 'Désignation', 'Dlv', 'Quantité', 'Prix Normal', 'Prix promo'];
+    const COL_COUNT = 6;
+
+    const COLORS = [
+        { name: 'Rouge',   hex: '#fecaca' },
+        { name: 'Orange',  hex: '#fed7aa' },
+        { name: 'Jaune',   hex: '#fef08a' },
+        { name: 'Vert',    hex: '#bbf7d0' },
+        { name: 'Bleu',    hex: '#bfdbfe' },
+        { name: 'Violet',  hex: '#e9d5ff' },
+        { name: 'Rose',    hex: '#fbcfe8' },
+        { name: 'Gris',    hex: '#e5e7eb' }
+    ];
+
+    let folder = null;
+    let currentSheet = 'Épicerie';
+    let sheetsData = { 'Épicerie': [], 'Boisson': [], 'DPH': [] };
+    let sha = null;
+    let hot = null;
+    let dirty = false;
+    // cellColors[sheet][rowIndex][colIndex] = '#hex'  (rowIndex = index dans sheetsData)
+    let cellColors = { 'Épicerie': {}, 'Boisson': {}, 'DPH': {} };
+
+    const infoBar = document.getElementById('infoBar');
+    const saveBtn = document.getElementById('saveBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const statusEl = document.getElementById('status');
+
+    const histClose = document.getElementById('histClose');
+    const histOverlay = document.getElementById('histOverlay');
+    if (histClose) histClose.addEventListener('click', () => histOverlay.classList.remove('show'));
+    if (histOverlay) histOverlay.addEventListener('click', (e) => {
+        if (e.target === histOverlay) histOverlay.classList.remove('show');
+    });
+    const histDownload = document.getElementById('histDownload');
+    if (histDownload) {
+        histDownload.addEventListener('click', () => {
+            const meta = lastHistData || {};
+            const list = meta.list || [];
+            const safeCode = String(meta.code || 'article').replace(/[^a-zA-Z0-9_-]/g, '_');
+            downloadHistListAsExcel(list, 'historique_' + safeCode + '.xlsx', meta);
+        });
+    }
+    const downloadHistBtn = document.getElementById('downloadHistBtn');
+    if (downloadHistBtn) downloadHistBtn.addEventListener('click', downloadFullHistorique);
+
+    const syncReloadBtn = document.getElementById('syncReloadBtn');
+    if (syncReloadBtn) {
+        syncReloadBtn.addEventListener('click', async () => {
+            hideSyncBanner();
+            dirty = false;
+            await loadFolder();
+        });
+    }
+
+    if (downloadBtn) downloadBtn.addEventListener('click', downloadExcel);
+    if (fullscreenBtn) fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+    const colorSimilarBtn = document.getElementById('colorSimilarBtn');
+    if (colorSimilarBtn) {
+        colorSimilarBtn.addEventListener('click', async () => {
+            if (!folder) {
+                showStatus('Choisissez KIBO4 ou KIBO2');
+                return;
+            }
+            if (dirty) {
+                const ok = await confirmDialog('Modifications non enregistrées', 'Enregistrer d\'abord ou continuer ? OK = lancer la coloration (sans vos modifs locales non sauvées).');
+                if (!ok) return;
+            }
+            const ok2 = await confirmDialog(
+                'Colorer les doublons',
+                'Colorer en rouge tous les produits présents à la fois dans Épicerie et Boisson ?'
+            );
+            if (!ok2) return;
+            colorSimilarBtn.disabled = true;
+            colorSimilarBtn.textContent = '…';
+            try {
+                const resp = await fetch(API, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folder, action: 'colorSimilar' })
+                });
+                const result = await resp.json();
+                if (!result.success) throw new Error(result.error || 'Erreur');
+                showStatus('🔴 ' + (result.message || 'Coloration OK'));
+                await loadFolder();
+            } catch (e) {
+                showStatus('Erreur : ' + e.message);
+                await confirmDialog('Erreur', e.message);
+            } finally {
+                colorSimilarBtn.disabled = false;
+                colorSimilarBtn.textContent = '🔴 Doublons E/B';
+            }
+        });
+    }
+    window.addEventListener('resize', () => {
+        if (hot) {
+            hot.updateSettings({ height: computeGridHeight() });
+            hot.render();
+        }
+    });
+    document.addEventListener('fullscreenchange', () => {
+        if (!document.fullscreenElement) {
+            document.body.classList.remove('fullscreen-mode');
+            if (fullscreenBtn) fullscreenBtn.textContent = '⛶ Plein écran';
+        }
+        if (hot) {
+            setTimeout(() => {
+                hot.updateSettings({ height: computeGridHeight() });
+                hot.render();
+            }, 100);
+        }
+    });
+
+    function showStatus(msg) {
+        statusEl.textContent = msg;
+        statusEl.classList.add('show');
+        setTimeout(() => statusEl.classList.remove('show'), 2500);
+    }
+
+    function confirmDialog(title, msg) {
+        return new Promise(resolve => {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMsg').textContent = msg;
+            document.getElementById('overlay').classList.add('show');
+            const ok = () => { cleanup(); resolve(true); };
+            const cancel = () => { cleanup(); resolve(false); };
+            function cleanup() {
+                document.getElementById('overlay').classList.remove('show');
+                document.getElementById('modalOk').removeEventListener('click', ok);
+                document.getElementById('modalCancel').removeEventListener('click', cancel);
+            }
+            document.getElementById('modalOk').addEventListener('click', ok);
+            document.getElementById('modalCancel').addEventListener('click', cancel);
+        });
+    }
+
+
+    let lastHistData = { code: '', designation: '', sheet: '', list: [] };
+
+    function downloadHistListAsExcel(list, fileName, meta) {
+        if (typeof XLSX === 'undefined') {
+            showStatus('Librairie Excel indisponible');
+            return;
+        }
+        if (!list || !list.length) {
+            showStatus('Aucun historique à télécharger');
+            return;
+        }
+        const aoa = [['Code Article', 'Désignation', 'Feuille', 'Date', 'Quantité', 'Prix promo', 'Dlv']];
+        list.forEach(h => {
+            aoa.push([
+                meta.code || h.codeArticle || '',
+                meta.designation || h.designation || '',
+                meta.sheet || '',
+                h.date || '',
+                h.quantite || '',
+                h.prixPromo || '',
+                h.dlv || ''
+            ]);
+        });
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = [{ wch: 14 }, { wch: 36 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 12 }];
+        XLSX.utils.book_append_sheet(wb, ws, 'Historique');
+        XLSX.writeFile(wb, fileName);
+        showStatus('⬇️ ' + fileName);
+    }
+
+    async function downloadFullHistorique() {
+        if (!folder) {
+            showStatus('Choisissez KIBO4 ou KIBO2');
+            return;
+        }
+        if (typeof XLSX === 'undefined') {
+            showStatus('Librairie Excel indisponible');
+            return;
+        }
+        showStatus('Préparation historique…');
+        try {
+            const resp = await fetch(API + '?folder=' + encodeURIComponent(folder) + '&action=historiqueAll');
+            const data = await resp.json();
+            if (!data.success) throw new Error(data.error || 'Erreur');
+            const sheets = data.sheets || {};
+            const wb = XLSX.utils.book_new();
+            let total = 0;
+            for (const sheetName of ['Épicerie', 'Boisson', 'DPH']) {
+                const rows = sheets[sheetName] || [];
+                total += rows.length;
+                const aoa = [['Code Article', 'Désignation', 'Date', 'Quantité', 'Prix promo', 'Dlv']];
+                rows.forEach(h => {
+                    aoa.push([
+                        h.codeArticle || '',
+                        h.designation || '',
+                        h.date || '',
+                        h.quantite || '',
+                        h.prixPromo || '',
+                        h.dlv || ''
+                    ]);
+                });
+                const ws = XLSX.utils.aoa_to_sheet(aoa);
+                ws['!cols'] = [{ wch: 14 }, { wch: 36 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 12 }];
+                XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            }
+            if (total === 0) {
+                showStatus('Historique vide pour ' + folder);
+                return;
+            }
+            const fileName = folder + '_historique-promo.xlsx';
+            XLSX.writeFile(wb, fileName);
+            showStatus('⬇️ ' + fileName);
+        } catch (e) {
+            showStatus('Erreur : ' + e.message);
+        }
+    }
+
+    async function openHistorique(codeArticle, designation) {
+        if (!folder) {
+            showStatus('Choisissez un dossier');
+            return;
+        }
+        const code = String(codeArticle || '').trim();
+        if (!code) {
+            showStatus('Code article manquant sur cette ligne');
+            return;
+        }
+        document.getElementById('histTitle').textContent = 'Historique promo';
+        document.getElementById('histSub').textContent = code + (designation ? ' — ' + designation : '') + ' · ' + currentSheet;
+        document.getElementById('histBody').innerHTML = '<div class="hist-empty">Chargement…</div>';
+        document.getElementById('histOverlay').classList.add('show');
+        try {
+            const url = API + '?folder=' + encodeURIComponent(folder)
+                + '&action=historique'
+                + '&sheet=' + encodeURIComponent(currentSheet)
+                + '&codeArticle=' + encodeURIComponent(code);
+            const resp = await fetch(url);
+            const data = await resp.json();
+            if (!data.success) throw new Error(data.error || 'Erreur');
+            const list = data.historique || [];
+            // Si vide : afficher l'état actuel de la grille comme référence
+            if (!list.length && hot) {
+                const data = hot.getData();
+                for (let r = 0; r < data.length; r++) {
+                    const c0 = String(data[r][0] || '').trim();
+                    if (c0 && c0 === code) {
+                        list = [{
+                            date: 'État actuel (pas encore enregistré dans l\'historique)',
+                            quantite: data[r][3] || '',
+                            prixPromo: data[r][5] || '',
+                            dlv: data[r][2] || '',
+                            codeArticle: code,
+                            designation: designation || data[r][1] || ''
+                        }];
+                        break;
+                    }
+                }
+            }
+            lastHistData = { code: code, designation: designation || '', sheet: currentSheet, list: list };
+            if (!list.length) {
+                document.getElementById('histBody').innerHTML = '<div class="hist-empty">Aucun historique.<br><small>Modifiez puis cliquez <b>Enregistrer</b> pour créer la première entrée.</small></div>';
+                return;
+            }
+            let html = '<table><thead><tr><th>Date</th><th>Quantité</th><th>Prix promo</th><th>DLV</th></tr></thead><tbody>';
+            list.forEach(h => {
+                html += '<tr>'
+                    + '<td>' + (h.date || '—') + '</td>'
+                    + '<td>' + (h.quantite || '—') + '</td>'
+                    + '<td>' + (h.prixPromo || '—') + '</td>'
+                    + '<td>' + (h.dlv || '—') + '</td>'
+                    + '</tr>';
+            });
+            html += '</tbody></table>';
+            document.getElementById('histBody').innerHTML = html;
+        } catch (e) {
+            document.getElementById('histBody').innerHTML = '<div class="hist-empty">Erreur : ' + e.message + '</div>';
+        }
+    }
+
+    function markDirty() {
+        dirty = true;
+        saveBtn.disabled = false;
+    }
+
+    function computeGridHeight() {
+        const top = document.querySelector('.top-bar');
+        const top2 = document.querySelectorAll('.top-bar')[1];
+        const info = document.getElementById('infoBar');
+        const color = document.getElementById('colorBar');
+        let used = 24;
+        [top, top2, info, color].forEach(el => {
+            if (el) used += el.getBoundingClientRect().height + 8;
+        });
+        return Math.max(320, window.innerHeight - used);
+    }
+
+    function downloadExcel() {
+        if (!folder) {
+            showStatus('Choisissez d\'abord KIBO4 ou KIBO2');
+            return;
+        }
+        saveGridToSheets();
+        if (typeof XLSX === 'undefined') {
+            showStatus('Librairie Excel indisponible');
+            return;
+        }
+        const wb = XLSX.utils.book_new();
+        for (const sheetName of ['Épicerie', 'Boisson', 'DPH']) {
+            const rows = sheetsData[sheetName] || [];
+            const aoa = [];
+            const now = new Date();
+            const dateStr = String(now.getDate()).padStart(2,'0') + '/' +
+                String(now.getMonth()+1).padStart(2,'0') + '/' + now.getFullYear() + ' ' +
+                String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+            aoa.push(['Date de mise à jour : ' + dateStr]);
+            aoa.push(COLS.slice());
+            rows.forEach(r => {
+                aoa.push([
+                    r.codeArticle || '',
+                    r.designation || '',
+                    r.dlv || '',
+                    r.quantite || '',
+                    r.prixNormale || '',
+                    r.prixPromo || ''
+                ]);
+            });
+            const ws = XLSX.utils.aoa_to_sheet(aoa);
+            // Merge first row across columns
+            ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: COL_COUNT - 1 } }];
+            ws['!cols'] = [
+                { wch: 14 }, { wch: 40 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 12 }
+            ];
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        }
+        const fileName = folder + '_dlv-prix.xlsx';
+        XLSX.writeFile(wb, fileName);
+        showStatus('⬇️ Téléchargé : ' + fileName);
+    }
+
+    function toggleFullscreen() {
+        const btn = document.getElementById('fullscreenBtn');
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().then(() => {
+                document.body.classList.add('fullscreen-mode');
+                if (btn) btn.textContent = '⛶ Quitter';
+                setTimeout(() => { if (hot) { hot.updateSettings({ height: computeGridHeight() }); hot.render(); } }, 150);
+            }).catch(() => {
+                // Fallback CSS-only fullscreen
+                document.body.classList.add('fullscreen-mode');
+                if (btn) btn.textContent = '⛶ Quitter';
+                if (hot) { hot.updateSettings({ height: computeGridHeight() }); hot.render(); }
+            });
+        } else {
+            document.exitFullscreen().then(() => {
+                document.body.classList.remove('fullscreen-mode');
+                if (btn) btn.textContent = '⛶ Plein écran';
+                setTimeout(() => { if (hot) { hot.updateSettings({ height: computeGridHeight() }); hot.render(); } }, 150);
+            }).catch(() => {
+                document.body.classList.remove('fullscreen-mode');
+                if (btn) btn.textContent = '⛶ Plein écran';
+                if (hot) { hot.updateSettings({ height: computeGridHeight() }); hot.render(); }
+            });
+        }
+    }
+
+
+
+    function colorKey(row, col) {
+        return row + ',' + col;
+    }
+
+    function getColor(sheet, row, col) {
+        const map = cellColors[sheet] || {};
+        return map[colorKey(row, col)] || '';
+    }
+
+    function setColor(sheet, row, col, hex) {
+        if (!cellColors[sheet]) cellColors[sheet] = {};
+        const k = colorKey(row, col);
+        if (hex) cellColors[sheet][k] = hex;
+        else delete cellColors[sheet][k];
+    }
+
+    function setRowColor(sheet, row, hex) {
+        for (let c = 0; c < COL_COUNT; c++) setColor(sheet, row, c, hex);
+    }
+
+    // ----- Selection dossiers / feuilles -----
+    document.querySelectorAll('.folder-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            if (dirty) {
+                const ok = await confirmDialog('Modifications non enregistrées', 'Vous avez des modifications non enregistrées. Continuer sans sauvegarder ?');
+                if (!ok) return;
+            }
+            document.querySelectorAll('.folder-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            folder = btn.dataset.folder;
+            await loadFolder();
+        });
+    });
+
+    document.querySelectorAll('.sheet-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (!folder) return;
+            saveGridToSheets();
+            document.querySelectorAll('.sheet-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            currentSheet = btn.dataset.sheet;
+            renderGrid();
+        });
+    });
+
+    async function loadFolder() {
+        infoBar.textContent = `Chargement de ${folder}/dlv-prix.xlsx…`;
+        saveBtn.disabled = true;
+        try {
+            const resp = await fetch(`${API}?folder=${folder}`);
+            const data = await resp.json();
+            if (!data.success) throw new Error(data.error || 'Erreur');
+            sheetsData = data.sheets || { 'Épicerie': [], 'Boisson': [], 'DPH': [] };
+            sha = data.sha;
+            // Restaurer les couleurs depuis _cellColors des lignes
+            cellColors = { 'Épicerie': {}, 'Boisson': {}, 'DPH': {} };
+            for (const sheet of Object.keys(sheetsData)) {
+                const rows = sheetsData[sheet] || [];
+                rows.forEach((r, ri) => {
+                    if (Array.isArray(r._cellColors)) {
+                        r._cellColors.forEach((hex, ci) => {
+                            if (hex) setColor(sheet, ri, ci, hex);
+                        });
+                    }
+                });
+            }
+            dirty = false;
+            hideSyncBanner();
+            infoBar.textContent = `${folder}/dlv-prix.xlsx — Dernière MAJ : ${data.updateDate || '—'} · Clic droit pour colorer`;
+            renderGrid();
+            showStatus('Fichier chargé');
+            startSyncPolling();
+        } catch (e) {
+            console.error(e);
+            infoBar.textContent = 'Erreur de chargement : ' + e.message;
+            showStatus('Erreur');
+        }
+    }
+
+    let syncTimer = null;
+    let syncChecking = false;
+
+    function hideSyncBanner() {
+        const b = document.getElementById('syncBanner');
+        if (b) b.classList.remove('show');
+    }
+
+    function showSyncBanner(msg) {
+        const b = document.getElementById('syncBanner');
+        const txt = document.getElementById('syncBannerText');
+        if (txt) txt.textContent = msg;
+        if (b) b.classList.add('show');
+    }
+
+    function stopSyncPolling() {
+        if (syncTimer) {
+            clearInterval(syncTimer);
+            syncTimer = null;
+        }
+    }
+
+    function startSyncPolling() {
+        stopSyncPolling();
+        // Vérifie toutes les 12 secondes si un autre utilisateur a enregistré
+        syncTimer = setInterval(checkRemoteUpdate, 12000);
+    }
+
+    async function checkRemoteUpdate() {
+        if (!folder || syncChecking) return;
+        syncChecking = true;
+        try {
+            const resp = await fetch(API + '?folder=' + encodeURIComponent(folder), { cache: 'no-store' });
+            const data = await resp.json();
+            if (!data.success) return;
+            const remoteSha = data.sha || null;
+            if (!remoteSha || !sha) return;
+            if (remoteSha === sha) {
+                // à jour
+                return;
+            }
+            // Fichier distant plus récent
+            if (!dirty) {
+                // Recharger automatiquement sans perdre de modifs locales
+                showStatus('Mise à jour détectée — rechargement…');
+                await loadFolder();
+            } else {
+                showSyncBanner('⚠️ Un autre utilisateur a enregistré. Actualisez pour voir ses changements (vos modifications non enregistrées seront perdues).');
+            }
+        } catch (_) {
+            /* ignore network blips */
+        } finally {
+            syncChecking = false;
+        }
+    }
+
+
+    function rowsToMatrix(rows) {
+        return rows.map(r => [
+            r.codeArticle || '',
+            r.designation || '',
+            r.dlv || '',
+            r.quantite || '',
+            r.prixNormale || '',
+            r.prixPromo || ''
+        ]);
+    }
+
+    function matrixToRows(matrix) {
+        const rows = [];
+        matrix.forEach((row, visualRow) => {
+            const isEmpty = !row.some(c => c !== null && c !== undefined && String(c).trim() !== '');
+            if (isEmpty) return;
+            const colors = [];
+            for (let c = 0; c < COL_COUNT; c++) {
+                colors.push(getColor(currentSheet, visualRow, c) || '');
+            }
+            rows.push({
+                codeArticle: String(row[0] || '').trim(),
+                designation: String(row[1] || '').trim(),
+                dlv: String(row[2] || '').trim(),
+                quantite: String(row[3] || '').trim(),
+                prixNormale: String(row[4] || '').trim(),
+                prixPromo: String(row[5] || '').trim(),
+                _cellColors: colors
+            });
+        });
+        return rows;
+    }
+
+    function saveGridToSheets() {
+        if (!hot) return;
+        const data = hot.getData();
+        // Capturer les couleurs depuis les meta Handsontable (source de vérité visuelle)
+        const newMap = {};
+        const rowCount = hot.countRows();
+        const colCount = Math.min(hot.countCols(), COL_COUNT);
+        for (let r = 0; r < rowCount; r++) {
+            for (let c = 0; c < colCount; c++) {
+                const meta = hot.getCellMeta(r, c);
+                if (meta && meta.bgColor) {
+                    newMap[colorKey(r, c)] = meta.bgColor;
+                }
+            }
+        }
+        cellColors[currentSheet] = newMap;
+
+        const rows = matrixToRows(data);
+        // Après filtrage, reconstruire la map avec les nouveaux index
+        const reindexed = {};
+        let dataIdx = 0;
+        data.forEach((row, visualRow) => {
+            const isEmpty = !row.some(c => c !== null && c !== undefined && String(c).trim() !== '');
+            if (isEmpty) return;
+            for (let c = 0; c < COL_COUNT; c++) {
+                const hex = newMap[colorKey(visualRow, c)];
+                if (hex) reindexed[colorKey(dataIdx, c)] = hex;
+            }
+            dataIdx++;
+        });
+        cellColors[currentSheet] = reindexed;
+        sheetsData[currentSheet] = rows;
+    }
+
+    function applyColorsToGrid() {
+        if (!hot) return;
+        const map = cellColors[currentSheet] || {};
+        Object.keys(map).forEach(k => {
+            const [r, c] = k.split(',').map(Number);
+            if (r < hot.countRows() && c < COL_COUNT) {
+                hot.setCellMeta(r, c, 'bgColor', map[k]);
+            }
+        });
+        hot.render();
+    }
+
+    function parseDlvTs(str) {
+        if (!str) return 0;
+        const m = String(str).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+        if (!m) return 0;
+        return new Date(+m[3], +m[2] - 1, +m[1]).getTime() || 0;
+    }
+
+    let colorMode = 'cell';
+
+    function forSelectionCells(selection, fn) {
+        (selection || []).forEach(sel => {
+            const r1 = Math.min(sel.start.row, sel.end.row);
+            const r2 = Math.max(sel.start.row, sel.end.row);
+            const c1 = Math.min(sel.start.col, sel.end.col);
+            const c2 = Math.max(sel.start.col, sel.end.col);
+            for (let r = r1; r <= r2; r++) {
+                for (let c = c1; c <= c2; c++) {
+                    if (c < COL_COUNT) fn(r, c);
+                }
+            }
+        });
+    }
+
+    function forSelectionRows(selection, fn) {
+        (selection || []).forEach(sel => {
+            const r1 = Math.min(sel.start.row, sel.end.row);
+            const r2 = Math.max(sel.start.row, sel.end.row);
+            for (let r = r1; r <= r2; r++) fn(r);
+        });
+    }
+
+    function rangesFromHot() {
+        if (!hot) return [];
+        const sel = hot.getSelectedRange();
+        if (!sel || !sel.length) return [];
+        return sel.map(range => ({
+            start: { row: range.from.row, col: range.from.col },
+            end: { row: range.to.row, col: range.to.col }
+        }));
+    }
+
+    function applyColorToSelection(hex) {
+        if (!hot) return;
+        const selection = rangesFromHot();
+        if (!selection.length) {
+            showStatus('Sélectionnez d\'abord une cellule');
+            return;
+        }
+        if (colorMode === 'row') {
+            forSelectionRows(selection, (r) => {
+                for (let c = 0; c < COL_COUNT; c++) {
+                    if (hex) {
+                        hot.setCellMeta(r, c, 'bgColor', hex);
+                        setColor(currentSheet, r, c, hex);
+                    } else {
+                        hot.setCellMeta(r, c, 'bgColor', undefined);
+                        setColor(currentSheet, r, c, '');
+                    }
+                }
+            });
+        } else {
+            forSelectionCells(selection, (r, c) => {
+                if (hex) {
+                    hot.setCellMeta(r, c, 'bgColor', hex);
+                    setColor(currentSheet, r, c, hex);
+                } else {
+                    hot.setCellMeta(r, c, 'bgColor', undefined);
+                    setColor(currentSheet, r, c, '');
+                }
+            });
+        }
+        hot.render();
+        markDirty();
+        showStatus(hex ? 'Couleur appliquée' : 'Couleur enlevée');
+    }
+
+    function buildColorSubmenu(prefix) {
+        const items = COLORS.map((col, i) => ({
+            key: prefix + ':' + i,
+            name: col.name,
+            callback: function () {
+                const selection = rangesFromHot();
+                if (!selection.length) return;
+                if (prefix === 'row_color') {
+                    forSelectionRows(selection, (r) => {
+                        for (let c = 0; c < COL_COUNT; c++) {
+                            hot.setCellMeta(r, c, 'bgColor', col.hex);
+                            setColor(currentSheet, r, c, col.hex);
+                        }
+                    });
+                } else {
+                    forSelectionCells(selection, (r, c) => {
+                        hot.setCellMeta(r, c, 'bgColor', col.hex);
+                        setColor(currentSheet, r, c, col.hex);
+                    });
+                }
+                hot.render();
+                markDirty();
+            }
+        }));
+        items.push({
+            key: prefix + ':none',
+            name: 'Enlever la couleur',
+            callback: function () {
+                const selection = rangesFromHot();
+                if (!selection.length) return;
+                if (prefix === 'row_color') {
+                    forSelectionRows(selection, (r) => {
+                        for (let c = 0; c < COL_COUNT; c++) {
+                            hot.setCellMeta(r, c, 'bgColor', undefined);
+                            setColor(currentSheet, r, c, '');
+                        }
+                    });
+                } else {
+                    forSelectionCells(selection, (r, c) => {
+                        hot.setCellMeta(r, c, 'bgColor', undefined);
+                        setColor(currentSheet, r, c, '');
+                    });
+                }
+                hot.render();
+                markDirty();
+            }
+        });
+        return items;
+    }
+
+    (function initColorBar() {
+        const bar = document.getElementById('colorBar');
+        if (!bar) return;
+        const clearBtn = bar.querySelector('.color-dot.clear');
+        COLORS.forEach(col => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'color-dot';
+            btn.style.background = col.hex;
+            btn.title = col.name;
+            btn.dataset.hex = col.hex;
+            bar.insertBefore(btn, clearBtn);
+        });
+        bar.addEventListener('click', (e) => {
+            const modeBtn = e.target.closest('.color-mode');
+            if (modeBtn) {
+                bar.querySelectorAll('.color-mode').forEach(b => b.classList.remove('active'));
+                modeBtn.classList.add('active');
+                colorMode = modeBtn.dataset.mode;
+                return;
+            }
+            const dot = e.target.closest('.color-dot');
+            if (dot) applyColorToSelection(dot.dataset.hex || '');
+        });
+    })();
+
+    function renderGrid() {
+        const container = document.getElementById('hot');
+        const data = rowsToMatrix(sheetsData[currentSheet] || []);
+
+        if (hot) {
+            hot.destroy();
+            hot = null;
+        }
+
+        while (data.length < 15) data.push(['', '', '', '', '', '']);
+
+        hot = new Handsontable(container, {
+            data,
+            colHeaders: COLS,
+            rowHeaders: true,
+            width: '100%',
+            height: computeGridHeight(),
+            stretchH: 'all',
+            licenseKey: 'non-commercial-and-evaluation',
+            manualColumnResize: true,
+            manualRowResize: true,
+            filters: true,
+            dropdownMenu: true,
+            columnSorting: true,
+            minSpareRows: 3,
+            cells(row, col) {
+                const cellProps = {};
+                cellProps.renderer = function (instance, td, row, col, prop, value, cellProperties) {
+                    Handsontable.renderers.TextRenderer.apply(this, arguments);
+                    const bg = cellProperties.bgColor || getColor(currentSheet, row, col);
+                    td.style.backgroundColor = bg || '';
+                };
+                return cellProps;
+            },
+            contextMenu: {
+                items: {
+                    'row_above': { name: 'Insérer ligne au-dessus' },
+                    'row_below': { name: 'Insérer ligne en-dessous' },
+                    'remove_row': { name: 'Supprimer la ligne' },
+                    'sp1': { name: '---------' },
+                    'copy': { name: 'Copier' },
+                    'cut': { name: 'Couper' },
+                    'sp2': { name: '---------' },
+                    'bg_color': {
+                        name: 'Couleur de fond',
+                        submenu: { items: buildColorSubmenu('bg_color') }
+                    },
+                    'row_color': {
+                        name: 'Colorer la ligne',
+                        submenu: { items: buildColorSubmenu('row_color') }
+                    },
+                    'sp3': { name: '---------' },
+                    'historique': {
+                        name: 'Historique',
+                        callback: function () {
+                            const sel = hot.getSelectedLast();
+                            if (!sel) return;
+                            const row = sel[0];
+                            const code = hot.getDataAtCell(row, 0);
+                            const des = hot.getDataAtCell(row, 1);
+                            openHistorique(code, des);
+                        }
+                    }
+                }
+            },
+            afterChange(changes, source) {
+                if (source !== 'loadData') markDirty();
+            },
+            afterCreateRow() { markDirty(); },
+            afterRemoveRow() { markDirty(); }
+        });
+
+        // Appliquer les couleurs déjà connues
+        applyColorsToGrid();
+    }
+
+    saveBtn.addEventListener('click', async () => {
+        if (!folder || !hot) return;
+        const ok = await confirmDialog('Enregistrer', `Enregistrer les modifications (avec couleurs) dans ${folder}/dlv-prix.xlsx ?`);
+        if (!ok) return;
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Enregistrement…';
+        showStatus('Enregistrement…');
+
+        try {
+            saveGridToSheets();
+
+            // Injecter _cellColors + tri DLV la plus proche (ancienne) en haut
+            for (const sheet of Object.keys(sheetsData)) {
+                const rows = sheetsData[sheet] || [];
+                const map = cellColors[sheet] || {};
+                rows.forEach((r, ri) => {
+                    const colors = [];
+                    for (let c = 0; c < COL_COUNT; c++) {
+                        colors.push(map[colorKey(ri, c)] || '');
+                    }
+                    r._cellColors = colors;
+                });
+                rows.sort((a, b) => (parseDlvTs(a.dlv) || Number.MAX_SAFE_INTEGER) - (parseDlvTs(b.dlv) || Number.MAX_SAFE_INTEGER));
+                // Reconstruire cellColors après le tri
+                const newMap = {};
+                rows.forEach((r, ri) => {
+                    (r._cellColors || []).forEach((hex, ci) => {
+                        if (hex) newMap[colorKey(ri, ci)] = hex;
+                    });
+                });
+                cellColors[sheet] = newMap;
+                sheetsData[sheet] = rows;
+            }
+
+            const now = new Date();
+            const dateStr = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+            const resp = await fetch(API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ folder, sheets: sheetsData, sha })
+            });
+            const result = await resp.json();
+            if (!result.success) throw new Error(result.error || 'Erreur');
+
+            sha = result.sha;
+            dirty = false;
+            // Après enregistrement : vider Ctrl+Z / Ctrl+Y (plus d'annulation des modifs déjà sauvées)
+            try {
+                if (hot) {
+                    const ur = hot.getPlugin('undoRedo');
+                    if (ur && typeof ur.clear === 'function') ur.clear();
+                }
+            } catch (_) { /* ignore */ }
+            infoBar.textContent = `${folder}/dlv-prix.xlsx — Enregistré à ${dateStr}`;
+            showStatus('✅ Enregistré avec succès');
+            renderGrid();
+            // Nouvelle grille = pile d'annulation vide
+        } catch (e) {
+            console.error(e);
+            showStatus('Erreur : ' + e.message);
+            await confirmDialog('Erreur', 'Échec de l\'enregistrement : ' + e.message);
+            saveBtn.disabled = false;
+        } finally {
+            saveBtn.textContent = '💾 Enregistrer';
+            if (dirty) saveBtn.disabled = false;
+        }
+    });
+
+    window.addEventListener('beforeunload', (e) => {
+        if (dirty) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+})();
+</script>
+</body>
+</html>

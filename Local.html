@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>BOTAKI - Commande locale</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: system-ui, 'Segoe UI', sans-serif; }
+        body { background: #f0f2f5; margin: 0; padding: 12px; }
+        .container { max-width: 100%; margin: 0 auto; background: white; border-radius: 24px; padding: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h1 { font-size: 1.35rem; margin-bottom: 0.4rem; text-align: center; color: #1e293b; user-select: none; }
+        .mode-badge {
+            display: inline-block; margin: 0 auto 12px; padding: 4px 14px; border-radius: 20px;
+            font-size: 0.75rem; font-weight: 700; text-align: center;
+        }
+        .mode-badge.classic { background: #e2e8f0; color: #334155; }
+        .mode-badge.pro { background: #1e2f6b; color: #f4b400; }
+        .mode-wrap { text-align: center; }
+        .mode-switch {
+            display: flex; justify-content: center; gap: 8px; margin: 8px 0 4px;
+        }
+        .mode-opt {
+            padding: 8px 16px; border-radius: 20px; border: 2px solid #cbd5e1;
+            background: #fff; font-weight: 700; font-size: 0.85rem; cursor: pointer;
+            color: #334155;
+        }
+        .mode-opt.selected {
+            border-color: #1e2f6b; background: #1e2f6b; color: #f4b400;
+        }
+        .mode-opt.pro-selected {
+            border-color: #1e2f6b; background: #1e2f6b; color: #f4b400;
+        }
+        .hidden { display: none !important; }
+        .filter-area { margin: 12px 0; display: flex; flex-direction: column; gap: 12px; }
+        .filter-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+        .filter-group { flex: 1; min-width: 140px; }
+        label { font-weight: 600; font-size: 0.8rem; display: block; margin-bottom: 4px; }
+        input, select { width: 100%; padding: 10px 14px; font-size: 0.9rem; border-radius: 40px; border: 1px solid #cbd5e1; }
+        .table-wrapper { overflow-x: auto; margin-top: 12px; border-radius: 16px; border: 1px solid #e2e8f0; }
+        table { width: 100%; min-width: 600px; border-collapse: collapse; }
+        th { background: #0f172a; color: white; padding: 8px 6px; font-size: 0.75rem; }
+        td { padding: 8px 6px; font-size: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: center; }
+        .clickable-row { cursor: pointer; }
+        .clickable-row:active td { filter: brightness(0.95); }
+        .commanded-row, .commanded-row td { background-color: #b91c1c !important; color: white !important; }
+        .row-yellow, .row-yellow td { background-color: #fef08a !important; color: #1e293b !important; }
+        .row-green, .row-green td { background-color: #86efac !important; color: #14532d !important; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 2000; }
+        .modal-content { background: white; padding: 22px; border-radius: 28px; width: 90%; max-width: 340px; text-align: center; }
+        .modal-content input { width: 100%; padding: 12px; margin: 10px 0 4px; border-radius: 40px; border: 1px solid #cbd5e1; font-size: 1rem; text-align: center; }
+        .calc-hint { font-size: 0.72rem; color: #94a3b8; margin: 2px 0 8px; }
+        .calc-result { font-size: 0.85rem; font-weight: 700; color: #16a34a; min-height: 18px; }
+        .modal-content button { padding: 8px 20px; margin: 5px; border: none; border-radius: 40px; cursor: pointer; font-weight: 600; }
+        .btn-add { background: #3b82f6; color: white; }
+        .btn-cancel { background: #e2e8f0; }
+        .action-btn { background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 30px; cursor: pointer; font-size: 0.7rem; margin: 0 3px; }
+        .delete-btn { background: #ef4444; }
+        .edit-btn { background: #f59e0b; }
+        .export-btn, .reset-btn, .pro-btn { color: white; border: none; padding: 8px 16px; border-radius: 40px; font-weight: 600; cursor: pointer; font-size: 0.85rem; }
+        .export-btn { background: #10b981; }
+        .reset-btn { background: #dc2626; }
+        .pro-btn { background: #1e2f6b; }
+        .button-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        footer { margin-top: 16px; font-size: 0.65rem; text-align: center; color: #64748b; }
+        .save-status { position: fixed; bottom: 10px; right: 10px; background: #2d4593cc; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; z-index: 1000; opacity: 0; transition: opacity .3s; }
+        .error-msg { background: #fee2e2; color: #b91c1c; padding: 8px; border-radius: 16px; text-align: center; margin-bottom: 12px; }
+        .pro-panel {
+            display: none; margin: 10px 0 14px; padding: 12px; border-radius: 16px;
+            background: #f8fafc; border: 1px solid #e2e8f0;
+        }
+        .pro-panel.show { display: block; }
+        .mag-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+        .mag-btns button {
+            flex: 1; min-width: 56px; padding: 10px 8px; border-radius: 12px;
+            border: 2px solid #cbd5e1; background: white; font-weight: 700; cursor: pointer;
+        }
+        .mag-btns button.selected { border-color: #1e2f6b; background: #1e2f6b; color: #f4b400; }
+        .legend { font-size: 0.7rem; color: #64748b; margin-top: 8px; line-height: 1.5; }
+        .legend span { display: inline-block; padding: 1px 8px; border-radius: 6px; margin-right: 4px; font-weight: 600; }
+        .leg-y { background: #fef08a; }
+        .leg-g { background: #86efac; }
+        .leg-r { background: #b91c1c; color: #fff; }
+        @media (max-width: 480px) {
+            body { padding: 8px; }
+            .container { padding: 12px; }
+            th, td { padding: 6px 4px; font-size: 0.7rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1 id="mainTitle">BOTAKI - Commande locale</h1>
+    <div class="mode-wrap">
+        <span class="mode-badge classic" id="modeBadge">Mode : Classique</span>
+        <div class="mode-switch" id="modeSwitch">
+            <button type="button" class="mode-opt selected" data-mode="classic" id="optClassic">Classique</button>
+            <button type="button" class="mode-opt" data-mode="pro" id="optPro">Professionnel</button>
+        </div>
+    </div>
+
+    <div id="errorMsg" class="error-msg hidden"></div>
+
+    <!-- Panneau mode professionnel -->
+    <div class="pro-panel" id="proPanel">
+        <label>📁 Fichier stock magasin (semaine)</label>
+        <input type="file" id="stockFileInput" accept=".xlsx,.xls">
+        <label style="margin-top:10px;">🏪 Magasin</label>
+        <div class="mag-btns" id="magBtns">
+            <button type="button" data-mag="KIB01">K1</button>
+            <button type="button" data-mag="KIB02">K2</button>
+            <button type="button" data-mag="KIB03">K3</button>
+            <button type="button" data-mag="KIB04">K4</button>
+            <button type="button" data-mag="KIB05">K5</button>
+        </div>
+        <p class="legend">
+            <span class="leg-y">Jaune</span> stock &lt; 15 ·
+            <span class="leg-g">Vert</span> stock÷PCB &lt; 2 ·
+            <span class="leg-r">Rouge</span> déjà commandé
+        </p>
+        <button type="button" class="pro-btn" id="backClassicBtn" style="margin-top:10px;">↩ Revenir au mode classique</button>
+    </div>
+
+    <div class="filter-area" id="filterArea" style="display: none;">
+        <div class="filter-row">
+            <div class="filter-group" id="fournisseurGroup">
+                <label>🏷️ Fournisseur</label>
+                <input type="text" id="fournisseurInput" placeholder="Ex: COSMEDIS" autocomplete="off">
+            </div>
+            <div class="filter-group">
+                <label>🔍 Désignation ou Code article</label>
+                <input type="text" id="designationFilter" placeholder="Rechercher…" autocomplete="off">
+            </div>
+        </div>
+    </div>
+
+    <div class="table-wrapper" id="tableContainer" style="display: none;">
+        <table id="resultTable">
+            <thead id="tableHead">
+                <tr><th>Code article</th><th>Désignation</th><th>PCB</th><th>Fournisseur</th></tr>
+            </thead>
+            <tbody id="tableBody"><tr><td colspan="4">Aucune donnée</td></tr></tbody>
+        </table>
+        <p style="font-size:0.7rem; margin-top:8px;" id="tableHint">✨ Cliquez sur une ligne pour commander. Articles déjà commandés en rouge.</p>
+    </div>
+
+    <div id="orderModal" class="modal">
+        <div class="modal-content">
+            <h3>🛒 Passer commande</h3>
+            <p id="modalArticleInfo">Article :</p>
+            <p id="modalPCB" style="font-weight:bold;">PCB :</p>
+            <p id="modalStock" class="hidden" style="font-weight:bold; color:#1e2f6b;">Stock magasin :</p>
+            <input type="text" id="commandeQty" placeholder="Ex: 4*5 ou 20" inputmode="decimal" value="1">
+            <p class="calc-hint">💡 Calcul : 4×5, 10+5, 30-2</p>
+            <p class="calc-result" id="calcResult"></p>
+            <div>
+                <button id="confirmOrderBtn" class="btn-add">Ajouter</button>
+                <button id="cancelOrderBtn" class="btn-cancel">Annuler</button>
+            </div>
+        </div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;flex-wrap:wrap;gap:10px;">
+        <h2 style="font-size:1.1rem;margin:0;">📋 Vos commandes</h2>
+        <div class="button-group">
+            <button id="resetOrdersBtn" class="reset-btn">🗑️ Réinitialiser</button>
+            <button id="exportExcelBtn" class="export-btn">📎 Exporter XLSX</button>
+        </div>
+    </div>
+    <div class="table-wrapper commandes-table">
+        <table id="cartTable">
+            <thead>
+                <tr><th>Fournisseur</th><th>Code Art.</th><th>Désignation</th><th>PCB</th><th>Qté</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="cartBody"><tr><td colspan="6">Aucune commande</td></tr></tbody>
+        </table>
+    </div>
+    <footer id="pageFooter">⚡ Mode classique · Utilisez les boutons Classique / Professionnel</footer>
+</div>
+<div id="saveStatus" class="save-status">💾 Sauvegardé</div>
+
+<script>
+(function () {
+    const EXCEL_URL = '/CADENCIER.xlsx';
+    const STORAGE_KEY_CLASSIC = 'BOTAKI_local_orders';
+    const STORAGE_KEY_PRO = 'BOTAKI_pro_orders';
+
+    // Map column keys for stock file
+    const MAG_COLS = {
+        KIB01: { qte: 'Qte KIB01', pmp: 'PMP KIB01', label: 'K1' },
+        KIB02: { qte: 'Qte KIB02', pmp: 'PMP KIB02', label: 'K2' },
+        KIB03: { qte: 'Qte KIB03', pmp: 'PMP KIB03', label: 'K3' },
+        KIB04: { qte: 'Qte KIB04', pmp: 'PMP KIB04', label: 'K4' },
+        KIB05: { qte: 'Qte Kibo5', pmp: 'PMP KIB05', label: 'K5' }
+    };
+
+    let mode = 'classic'; // classic | pro
+    let allRows = [];          // classic cadencier rows
+    let cadencierByCode = {};  // codeArticle -> { pcb, fournisseur, designation }
+    let stockRows = [];       // pro rows from uploaded file
+    let selectedMag = null;   // KIB01…
+    let orders = [];
+    let editIndex = null;
+    let currentSelectedArticle = null;
+
+    const errorMsgDiv = document.getElementById('errorMsg');
+    const filterArea = document.getElementById('filterArea');
+    const tableContainer = document.getElementById('tableContainer');
+    const tableBody = document.getElementById('tableBody');
+    const tableHead = document.getElementById('tableHead');
+    const fournisseurInput = document.getElementById('fournisseurInput');
+    const designationFilter = document.getElementById('designationFilter');
+    const cartBody = document.getElementById('cartBody');
+    const modal = document.getElementById('orderModal');
+    const modalArticleInfo = document.getElementById('modalArticleInfo');
+    const modalPCB = document.getElementById('modalPCB');
+    const modalStock = document.getElementById('modalStock');
+    const commandeQty = document.getElementById('commandeQty');
+    const confirmOrderBtn = document.getElementById('confirmOrderBtn');
+    const modeBadge = document.getElementById('modeBadge');
+    const proPanel = document.getElementById('proPanel');
+    const saveStatusDiv = document.getElementById('saveStatus');
+    const mainTitle = document.getElementById('mainTitle');
+
+    function storageKey() {
+        return mode === 'pro' ? STORAGE_KEY_PRO : STORAGE_KEY_CLASSIC;
+    }
+
+    function showError(msg) {
+        errorMsgDiv.innerText = msg;
+        errorMsgDiv.classList.remove('hidden');
+        setTimeout(() => errorMsgDiv.classList.add('hidden'), 5000);
+    }
+
+    function sauvegarderCommandes() {
+        localStorage.setItem(storageKey(), JSON.stringify(orders));
+        saveStatusDiv.style.opacity = '1';
+        setTimeout(() => { saveStatusDiv.style.opacity = '0'; }, 1500);
+    }
+
+    function chargerCommandes() {
+        try {
+            const saved = localStorage.getItem(storageKey());
+            orders = saved ? JSON.parse(saved) : [];
+            if (!Array.isArray(orders)) orders = [];
+        } catch (_) { orders = []; }
+        renderCart();
+    }
+
+    function normCode(c) {
+        if (c == null || c === '') return '';
+        let s = String(c).trim();
+        // enlever décimales Excel (50043054.0)
+        if (/^\d+\.0+$/.test(s)) s = s.replace(/\.0+$/, '');
+        // pure numérique → forme canonique sans zéros inutiles à gauche
+        if (/^\d+$/.test(s)) {
+            try { s = String(BigInt(s)); } catch (_) { s = String(parseInt(s, 10)); }
+        }
+        return s;
+    }
+
+    function parseNum(v) {
+        if (v === null || v === undefined || v === '') return 0;
+        if (typeof v === 'number') return isFinite(v) ? v : 0;
+        const n = parseFloat(String(v).replace(',', '.').replace(/\s/g, ''));
+        return isFinite(n) ? n : 0;
+    }
+
+    function parsePcb(pcb) {
+        const n = parseNum(pcb);
+        return n > 0 ? n : 0;
+    }
+
+    function isArticleCommanded(article) {
+        const code = normCode(article.codeArticle);
+        return orders.some(o => normCode(o.codeArticle) === code);
+    }
+
+    // ---------- CADENCIER ----------
+    async function chargerCadencier() {
+        const response = await fetch(EXCEL_URL, { cache: 'no-store' });
+        if (!response.ok) throw new Error('CADENCIER.xlsx introuvable');
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
+        let startRow = 0;
+        const firstCell = String((rows[0] && rows[0][0]) || '').toLowerCase();
+        if (firstCell.includes('code') || firstCell.includes('barre')) startRow = 1;
+
+        const produits = [];
+        cadencierByCode = {};
+        let lastSupplier = '';
+        for (let i = startRow; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row || !row.length) continue;
+            const codeArticle = normCode(row[1]);
+            const designation = String(row[2] || '').trim();
+            const pcb = String(row[3] != null ? row[3] : '').trim();
+            let fournisseur = String(row[4] || '').trim();
+            if (!fournisseur) fournisseur = lastSupplier;
+            else lastSupplier = fournisseur;
+            if (!codeArticle && !designation) continue;
+            const item = {
+                codeBarre: String(row[0] || '').trim(),
+                codeArticle,
+                designation,
+                pcb,
+                fournisseur
+            };
+            produits.push(item);
+            if (codeArticle) cadencierByCode[codeArticle] = item;
+        }
+        allRows = produits;
+        return produits;
+    }
+
+    // ---------- STOCK FILE ----------
+    function findCol(headers, candidates) {
+        const lower = headers.map(h => String(h || '').trim().toLowerCase());
+        for (const c of candidates) {
+            const i = lower.indexOf(c.toLowerCase());
+            if (i >= 0) return i;
+        }
+        // fuzzy
+        for (let i = 0; i < lower.length; i++) {
+            for (const c of candidates) {
+                if (lower[i].includes(c.toLowerCase())) return i;
+            }
+        }
+        return -1;
+    }
+
+    function parseStockFile(arrayBuffer) {
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
+        if (!rows || rows.length < 2) throw new Error('Fichier stock vide');
+
+        // Trouver la ligne d'en-tête
+        let headerIdx = 0;
+        for (let i = 0; i < Math.min(10, rows.length); i++) {
+            const cells = (rows[i] || []).map(c => String(c == null ? '' : c).toLowerCase());
+            const line = cells.join(' | ');
+            if (line.includes('code') && (line.includes('design') || line.includes('désign') || line.includes('article'))) {
+                headerIdx = i;
+                break;
+            }
+        }
+        const header = (rows[headerIdx] || []).map(c => String(c == null ? '' : c).trim());
+        console.log('[stock] header row', headerIdx, header);
+
+        function idxOf(tests) {
+            for (let i = 0; i < header.length; i++) {
+                const h = header[i].toLowerCase().replace(/\s+/g, ' ');
+                if (/pmp/.test(h)) continue;
+                if (/d[eé]p[oô]t/.test(h)) continue;
+                for (const t of tests) {
+                    if (t.test(h)) return i;
+                }
+            }
+            return -1;
+        }
+
+        let iCode = idxOf([/^code\s*article$/, /code\s*article/]);
+        let iDes  = idxOf([/^d[eé]signation$/, /designation/]);
+        let iK1 = idxOf([/qte\s*kib\s*0*1$/, /qte\s*kib\s*0*1\b/, /^qte\s*kib\s*1$/]);
+        let iK2 = idxOf([/qte\s*kib\s*0*2$/, /qte\s*kib\s*0*2\b/, /^qte\s*kib\s*2$/]);
+        let iK3 = idxOf([/qte\s*kib\s*0*3$/, /qte\s*kib\s*0*3\b/, /^qte\s*kib\s*3$/]);
+        let iK4 = idxOf([/qte\s*kib\s*0*4$/, /qte\s*kib\s*0*4\b/, /^qte\s*kib\s*4$/]);
+        let iK5 = idxOf([/qte\s*kibo?\s*0*5$/, /qte\s*kib\s*0*5\b/, /kibo\s*5/]);
+
+        // Structure connue du fichier stock magasin :
+        // 0 Code Article | 1 Désignation | 2 Rayon | 3 Code Famille | 4 Famille | 5 TypeFournisseurs
+        // 6 Qte Dépôt | 7 Qte KIB01 | 8 Qte KIB02 | 9 Qte KIB03 | 10 Qte KIB04 | 11 Qte Kibo5
+        if (iCode < 0) iCode = 0;
+        if (iDes < 0) iDes = 1;
+        if (iK1 < 0 && header.length >= 12) iK1 = 7;
+        if (iK2 < 0 && header.length >= 12) iK2 = 8;
+        if (iK3 < 0 && header.length >= 12) iK3 = 9;
+        if (iK4 < 0 && header.length >= 12) iK4 = 10;
+        if (iK5 < 0 && header.length >= 12) iK5 = 11;
+
+        // Si toujours pas trouvé, chercher toute colonne contenant kib01 etc.
+        function softIdx(token) {
+            for (let i = 0; i < header.length; i++) {
+                const h = header[i].toLowerCase().replace(/\s+/g, '');
+                if (/pmp/.test(h) || /depot/.test(h) || /d[eé]p/.test(h)) continue;
+                if (h.includes(token)) return i;
+            }
+            return -1;
+        }
+        if (iK1 < 0) iK1 = softIdx('kib01') >= 0 ? softIdx('kib01') : softIdx('kib1');
+        if (iK2 < 0) iK2 = softIdx('kib02') >= 0 ? softIdx('kib02') : softIdx('kib2');
+        if (iK3 < 0) iK3 = softIdx('kib03') >= 0 ? softIdx('kib03') : softIdx('kib3');
+        if (iK4 < 0) iK4 = softIdx('kib04') >= 0 ? softIdx('kib04') : softIdx('kib4');
+        if (iK5 < 0) iK5 = softIdx('kibo5') >= 0 ? softIdx('kibo5') : (softIdx('kib05') >= 0 ? softIdx('kib05') : softIdx('kib5'));
+
+        const colInfo = {
+            code: iCode + ':' + (header[iCode] || '?'),
+            K1: iK1 + ':' + (header[iK1] || '?'),
+            K2: iK2 + ':' + (header[iK2] || '?'),
+            K3: iK3 + ':' + (header[iK3] || '?'),
+            K4: iK4 + ':' + (header[iK4] || '?'),
+            K5: iK5 + ':' + (header[iK5] || '?')
+        };
+
+        const out = [];
+        let matchedCad = 0;
+        let nonZero = 0;
+        const sampleHits = [];
+
+        for (let r = headerIdx + 1; r < rows.length; r++) {
+            const row = rows[r];
+            if (!row || !row.length) continue;
+            const codeArticle = normCode(row[iCode]);
+            if (!codeArticle || codeArticle.toLowerCase() === 'total') continue;
+
+            const q1 = iK1 >= 0 ? parseNum(row[iK1]) : 0;
+            const q2 = iK2 >= 0 ? parseNum(row[iK2]) : 0;
+            const q3 = iK3 >= 0 ? parseNum(row[iK3]) : 0;
+            const q4 = iK4 >= 0 ? parseNum(row[iK4]) : 0;
+            const q5 = iK5 >= 0 ? parseNum(row[iK5]) : 0;
+            const sum = q1 + q2 + q3 + q4 + q5;
+            if (sum > 0) nonZero++;
+
+            const inCad = !!cadencierByCode[codeArticle];
+            if (inCad) {
+                matchedCad++;
+                if (sampleHits.length < 5 && sum > 0) {
+                    sampleHits.push(codeArticle + '→ K1=' + q1 + ' K2=' + q2 + ' K3=' + q3);
+                }
+            }
+
+            out.push({
+                codeArticle,
+                designation: iDes >= 0 ? String(row[iDes] == null ? '' : row[iDes]).trim() : '',
+                qteKIB01: q1,
+                qteKIB02: q2,
+                qteKIB03: q3,
+                qteKIB04: q4,
+                qteKIB05: q5
+            });
+        }
+
+        // Index multi-clés pour le join
+        window.__stockByCode = {};
+        out.forEach(item => {
+            window.__stockByCode[item.codeArticle] = item;
+        });
+
+        window.__stockColInfo =
+            'Colonnes: ' + JSON.stringify(colInfo) +
+            '\nLignes: ' + out.length +
+            ' | Liés cadencier: ' + matchedCad +
+            ' | Avec stock>0: ' + nonZero +
+            (sampleHits.length ? ('\nEx: ' + sampleHits.join(' · ')) : '\n(Aucun article cadencier avec stock>0 trouvé)');
+
+        console.log('[stock]', window.__stockColInfo);
+        return out;
+    }
+
+    function stockForMag(row) {
+        if (!selectedMag) return 0;
+        const map = {
+            KIB01: row.qteKIB01,
+            KIB02: row.qteKIB02,
+            KIB03: row.qteKIB03,
+            KIB04: row.qteKIB04,
+            KIB05: row.qteKIB05
+        };
+        return map[selectedMag] || 0;
+    }
+
+    // ---------- UI MODE ----------
+    function setMode(newMode) {
+        mode = newMode;
+        chargerCommandes();
+        if (typeof updateModeButtons === 'function') updateModeButtons();
+        if (mode === 'classic') {
+            modeBadge.textContent = 'Mode : Classique';
+            modeBadge.className = 'mode-badge classic';
+            proPanel.classList.remove('show');
+            document.getElementById('pageFooter').textContent =
+                '⚡ Mode classique · Utilisez les boutons Classique / Professionnel';
+            tableHead.innerHTML = '<tr><th>Code article</th><th>Désignation</th><th>PCB</th><th>Fournisseur</th></tr>';
+            document.getElementById('fournisseurGroup').style.display = '';
+            filterArea.style.display = allRows.length ? 'block' : 'none';
+            tableContainer.style.display = allRows.length ? 'block' : 'none';
+            filterTable();
+        } else {
+            modeBadge.textContent = 'Mode : Professionnel' + (selectedMag && MAG_COLS[selectedMag] ? ' · ' + MAG_COLS[selectedMag].label : '');
+            modeBadge.className = 'mode-badge pro';
+            proPanel.classList.add('show');
+            document.getElementById('pageFooter').textContent =
+                '⚡ Mode professionnel · Liste cadencier local + stock du magasin choisi';
+            tableHead.innerHTML = '<tr><th>Code article</th><th>Désignation</th><th>PCB</th><th>Stock</th><th>Fournisseur</th></tr>';
+            document.getElementById('fournisseurGroup').style.display = '';
+            if (stockRows.length && selectedMag) {
+                filterArea.style.display = 'block';
+                tableContainer.style.display = 'block';
+                filterTable();
+            } else {
+                filterArea.style.display = 'none';
+                tableContainer.style.display = 'none';
+            }
+        }
+        renderCart();
+    }
+
+    // Choix mode : boutons Classique / Professionnel
+    function updateModeButtons() {
+        const c = document.getElementById('optClassic');
+        const pr = document.getElementById('optPro');
+        if (c) c.classList.toggle('selected', mode === 'classic');
+        if (pr) pr.classList.toggle('selected', mode === 'pro');
+    }
+
+    document.getElementById('optClassic').addEventListener('click', () => {
+        setMode('classic');
+        updateModeButtons();
+    });
+    document.getElementById('optPro').addEventListener('click', () => {
+        setMode('pro');
+        updateModeButtons();
+    });
+    document.getElementById('backClassicBtn').addEventListener('click', () => {
+        setMode('classic');
+        updateModeButtons();
+    });
+
+    document.getElementById('stockFileInput').addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        try {
+            const buf = await file.arrayBuffer();
+            stockRows = parseStockFile(buf);
+            if (!stockRows.length) throw new Error('Aucun article lu');
+            showError(''); // clear
+            errorMsgDiv.classList.add('hidden');
+            if (selectedMag) {
+                filterArea.style.display = 'block';
+                tableContainer.style.display = 'block';
+                filterTable();
+            } else {
+                alert('Stock chargé
+' + (window.__stockColInfo || '') + '
+
+Choisissez un magasin K1–K5.');
+            }
+        } catch (err) {
+            stockRows = [];
+            showError('Erreur stock : ' + err.message);
+        }
+    });
+
+    document.querySelectorAll('#magBtns button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#magBtns button').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            selectedMag = btn.dataset.mag;
+            modeBadge.textContent = 'Mode : Professionnel · ' + (MAG_COLS[selectedMag].label);
+            if (!stockRows.length) {
+                alert('Chargez d\'abord le fichier stock magasin.');
+                return;
+            }
+            filterArea.style.display = 'block';
+            tableContainer.style.display = 'block';
+            filterTable();
+            // Diagnostic si tout reste à 0
+            setTimeout(() => {
+                const hint = document.getElementById('tableHint');
+                if (hint && hint.textContent.indexOf('stock>0: 0/') >= 0) {
+                    alert('⚠ Stock toujours à 0.\n' + (window.__stockColInfo || 'Pas d\'info colonnes') +
+                        '\nVérifiez que le fichier a les colonnes Qte KIB01…Qte Kibo5.');
+                }
+            }, 300);
+        });
+    });
+
+    // ---------- FILTER / TABLE ----------
+    function filterTable() {
+        if (mode === 'classic') {
+            if (!allRows.length) return;
+            const fTerm = fournisseurInput.value.trim().toLowerCase();
+            const dTerm = designationFilter.value.trim().toLowerCase();
+            let filtered = allRows;
+            if (fTerm) filtered = filtered.filter(r => (r.fournisseur || '').toLowerCase().includes(fTerm));
+            if (dTerm) filtered = filtered.filter(r =>
+                (r.designation || '').toLowerCase().includes(dTerm) ||
+                (r.codeArticle || '').toLowerCase().includes(dTerm)
+            );
+            renderClassicRows(filtered);
+            return;
+        }
+
+        // pro : base = CADENCIER (commande locale), stock magasin en enrichissement
+        if (!allRows.length || !selectedMag) return;
+        if (!stockRows.length) {
+            tableBody.innerHTML = '<tr><td colspan="5">Chargez le fichier stock magasin</td></tr>';
+            return;
+        }
+        const stockMap = window.__stockByCode || {};
+        // Sécurité : reconstruire si besoin
+        if (!Object.keys(stockMap).length && stockRows.length) {
+            stockRows.forEach(r => {
+                const c = normCode(r.codeArticle);
+                if (c) stockMap[c] = r;
+            });
+        }
+        const fTerm = fournisseurInput.value.trim().toLowerCase();
+        const dTerm = designationFilter.value.trim().toLowerCase();
+        let withStock = 0;
+        let linked = 0;
+        let filtered = allRows.map(art => {
+            const key = normCode(art.codeArticle);
+            let st = stockMap[key];
+            // 2e tentative : clé brute
+            if (!st && art.codeArticle != null) st = stockMap[String(art.codeArticle).trim()];
+            const stock = st ? stockForMag(st) : 0;
+            if (st) linked++;
+            if (stock > 0) withStock++;
+            return Object.assign({}, art, { stockMagasin: stock, hasStockRow: !!st });
+        });
+        // info discrète
+        const hint = document.getElementById('tableHint');
+        if (hint) {
+            hint.textContent = '✨ ' + (MAG_COLS[selectedMag] ? MAG_COLS[selectedMag].label : '') +
+                ' · liés=' + linked + ' · stock>0: ' + withStock + '/' + allRows.length +
+                ' · Rouge=commandé · Vert=stock/PCB<2 · Jaune=stock<15';
+        }
+        if (fTerm) filtered = filtered.filter(r => (r.fournisseur || '').toLowerCase().includes(fTerm));
+        if (dTerm) filtered = filtered.filter(r =>
+            (r.designation || '').toLowerCase().includes(dTerm) ||
+            (r.codeArticle || '').toLowerCase().includes(dTerm)
+        );
+        renderProRows(filtered);
+    }
+
+    function renderClassicRows(filtered) {
+        if (!filtered.length) {
+            tableBody.innerHTML = '<tr><td colspan="4">Aucun article</td></tr>';
+            return;
+        }
+        tableBody.innerHTML = '';
+        filtered.forEach(article => {
+            const tr = document.createElement('tr');
+            tr.classList.add('clickable-row');
+            if (isArticleCommanded(article)) tr.classList.add('commanded-row');
+            tr.addEventListener('click', () => openOrderModal(article, null));
+            [article.codeArticle, article.designation, article.pcb, article.fournisseur].forEach(val => {
+                const td = document.createElement('td');
+                td.textContent = val || '—';
+                tr.appendChild(td);
+            });
+            tableBody.appendChild(tr);
+        });
+    }
+
+    function renderProRows(filtered) {
+        if (!filtered.length) {
+            tableBody.innerHTML = '<tr><td colspan="5">Aucun article</td></tr>';
+            return;
+        }
+        tableBody.innerHTML = '';
+        filtered.forEach(row => {
+            const stock = stockForMag(row);
+            const pcbN = parsePcb(row.pcb);
+            const tr = document.createElement('tr');
+            tr.classList.add('clickable-row');
+
+            // Priorité : rouge > vert > jaune
+            if (isArticleCommanded(row)) {
+                tr.classList.add('commanded-row');
+            } else if (pcbN > 0 && (stock / pcbN) < 2) {
+                tr.classList.add('row-green');
+            } else if (stock < 15) {
+                tr.classList.add('row-yellow');
+            }
+
+            const article = {
+                codeArticle: row.codeArticle,
+                designation: row.designation,
+                pcb: row.pcb,
+                fournisseur: row.fournisseur,
+                stockMagasin: stock
+            };
+            tr.addEventListener('click', () => openOrderModal(article, null));
+            [row.codeArticle, row.designation, row.pcb || '—', stock, row.fournisseur || '—'].forEach(val => {
+                const td = document.createElement('td');
+                td.textContent = val !== undefined && val !== null && val !== '' ? val : '—';
+                tr.appendChild(td);
+            });
+            tableBody.appendChild(tr);
+        });
+    }
+
+    // ---------- MODAL ----------
+    function openOrderModal(article, editIdx) {
+        currentSelectedArticle = article;
+        editIndex = editIdx;
+        modalArticleInfo.textContent = '📦 ' + (article.codeArticle || '') + ' — ' + (article.designation || '');
+        modalPCB.textContent = 'PCB : ' + (article.pcb || '—');
+        if (mode === 'pro') {
+            modalStock.classList.remove('hidden');
+            const st = article.stockMagasin !== undefined ? article.stockMagasin : '—';
+            const magLabel = selectedMag && MAG_COLS[selectedMag] ? MAG_COLS[selectedMag].label : '';
+            modalStock.textContent = 'Stock magasin' + (magLabel ? ' (' + magLabel + ')' : '') + ' : ' + st;
+        } else {
+            modalStock.classList.add('hidden');
+        }
+        commandeQty.value = (editIndex !== null && orders[editIndex]) ? String(orders[editIndex].commande) : '1';
+        confirmOrderBtn.textContent = editIndex !== null ? 'Modifier' : 'Ajouter';
+        document.getElementById('calcResult').textContent = '';
+        modal.style.display = 'flex';
+        setTimeout(() => commandeQty.select(), 50);
+    }
+
+    function closeModal() {
+        modal.style.display = 'none';
+        currentSelectedArticle = null;
+        editIndex = null;
+    }
+
+    function evalCalc(expr) {
+        const clean = expr.toString().trim().replace(/\s/g, '').replace(',', '.').replace(/×/g, '*').replace(/x/gi, '*');
+        if (!/^[\d+\-*/().]+$/.test(clean)) return null;
+        try {
+            const result = Function('"use strict"; return (' + clean + ')')();
+            if (typeof result !== 'number' || !isFinite(result)) return null;
+            return Math.round(result * 1000) / 1000;
+        } catch (_) { return null; }
+    }
+
+    commandeQty.addEventListener('input', () => {
+        const val = commandeQty.value.trim();
+        const el = document.getElementById('calcResult');
+        if (!val || /^\d+$/.test(val)) { el.textContent = ''; return; }
+        const result = evalCalc(val);
+        el.textContent = (result !== null && result > 0) ? ('= ' + result) : '';
+    });
+
+    function saveOrder() {
+        if (!currentSelectedArticle) return;
+        const rawVal = commandeQty.value.trim();
+        const computed = evalCalc(rawVal);
+        const qty = (computed !== null) ? Math.floor(computed) : parseInt(rawVal, 10);
+        if (isNaN(qty) || qty <= 0) { alert('Quantité invalide'); return; }
+        const newOrder = {
+            codeArticle: currentSelectedArticle.codeArticle,
+            designation: currentSelectedArticle.designation,
+            pcb: currentSelectedArticle.pcb || '',
+            commande: qty,
+            fournisseur: currentSelectedArticle.fournisseur || ''
+        };
+        if (editIndex !== null) orders[editIndex] = newOrder;
+        else orders.push(newOrder);
+        renderCart();
+        sauvegarderCommandes();
+        filterTable();
+        closeModal();
+    }
+
+    function removeOrder(index) {
+        orders.splice(index, 1);
+        renderCart();
+        sauvegarderCommandes();
+        filterTable();
+    }
+
+    function editOrder(index) {
+        const order = orders[index];
+        if (mode === 'classic') {
+            const article = allRows.find(a => normCode(a.codeArticle) === normCode(order.codeArticle));
+            openOrderModal(article || order, index);
+        } else {
+            const art = allRows.find(a => normCode(a.codeArticle) === normCode(order.codeArticle));
+            const st = stockRows.find(a => normCode(a.codeArticle) === normCode(order.codeArticle));
+            const article = {
+                codeArticle: order.codeArticle,
+                designation: (art && art.designation) || order.designation,
+                pcb: (art && art.pcb) || order.pcb,
+                fournisseur: (art && art.fournisseur) || order.fournisseur,
+                stockMagasin: st ? stockForMag(st) : 0
+            };
+            openOrderModal(article, index);
+        }
+    }
+
+    function renderCart() {
+        if (!orders.length) {
+            cartBody.innerHTML = '<tr><td colspan="6">Aucune commande</td></tr>';
+            return;
+        }
+        cartBody.innerHTML = '';
+        orders.forEach((order, idx) => {
+            const tr = document.createElement('tr');
+            // Affichage : Fournisseur, Code, Désignation, PCB, Qté
+            [order.fournisseur, order.codeArticle, order.designation, order.pcb, order.commande].forEach(val => {
+                const td = document.createElement('td');
+                td.textContent = val != null && val !== '' ? val : '—';
+                tr.appendChild(td);
+            });
+            const tdAction = document.createElement('td');
+            const editBtn = document.createElement('button');
+            editBtn.textContent = 'Modifier';
+            editBtn.className = 'action-btn edit-btn';
+            editBtn.onclick = (e) => { e.stopPropagation(); editOrder(idx); };
+            const delBtn = document.createElement('button');
+            delBtn.textContent = 'Supprimer';
+            delBtn.className = 'action-btn delete-btn';
+            delBtn.onclick = (e) => { e.stopPropagation(); removeOrder(idx); };
+            tdAction.appendChild(editBtn);
+            tdAction.appendChild(delBtn);
+            tr.appendChild(tdAction);
+            cartBody.appendChild(tr);
+        });
+    }
+
+    function resetAllOrders() {
+        if (!orders.length) return;
+        if (confirm('Réinitialiser toutes les commandes ?')) {
+            orders = [];
+            sauvegarderCommandes();
+            renderCart();
+            filterTable();
+        }
+    }
+
+    // Export : Fournisseur | Code article | Désignation | PCB | Commande
+    async function exportToExcel() {
+        if (!orders.length) { alert('Aucune commande'); return; }
+        let fileName = prompt(
+            'Nom du fichier (sans extension)',
+            'commandes_' + (mode === 'pro' ? 'pro_' : '') + new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+        );
+        if (!fileName) return;
+        fileName = fileName.replace(/[^\w\-]+/g, '_') + '.xlsx';
+
+        const grouped = new Map();
+        orders.forEach(o => {
+            const key = o.fournisseur || 'Sans fournisseur';
+            if (!grouped.has(key)) grouped.set(key, []);
+            grouped.get(key).push(o);
+        });
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Commandes');
+        worksheet.columns = [
+            { header: 'Fournisseur', key: 'fournisseur', width: 28 },
+            { header: 'Code article', key: 'codeArticle', width: 14 },
+            { header: 'Désignation', key: 'designation', width: 42 },
+            { header: 'PCB', key: 'pcb', width: 10 },
+            { header: 'Commande', key: 'commande', width: 12 }
+        ];
+        const headerRow = worksheet.getRow(1);
+        headerRow.eachCell(cell => {
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0f172a' } };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        });
+
+        let currentRow = 2;
+        const fournisseurs = Array.from(grouped.keys());
+        for (let i = 0; i < fournisseurs.length; i++) {
+            const commandes = grouped.get(fournisseurs[i]);
+            for (const order of commandes) {
+                const row = worksheet.getRow(currentRow);
+                row.getCell(1).value = order.fournisseur || '';
+                row.getCell(2).value = order.codeArticle || '';
+                row.getCell(3).value = order.designation || '';
+                row.getCell(4).value = order.pcb || '';
+                row.getCell(5).value = order.commande;
+                row.eachCell(cell => { cell.alignment = { horizontal: 'center', vertical: 'middle' }; });
+                currentRow++;
+            }
+            if (i < fournisseurs.length - 1) {
+                worksheet.getRow(currentRow).height = 15;
+                currentRow++;
+            }
+        }
+        worksheet.eachRow(row => { row.height = 20; });
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        saveAs(new Blob([buffer]), fileName);
+
+        orders = [];
+        sauvegarderCommandes();
+        renderCart();
+        filterTable();
+    }
+
+    // Events
+    fournisseurInput.addEventListener('input', filterTable);
+    designationFilter.addEventListener('input', filterTable);
+    confirmOrderBtn.addEventListener('click', saveOrder);
+    document.getElementById('cancelOrderBtn').addEventListener('click', closeModal);
+    window.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+    document.getElementById('exportExcelBtn').addEventListener('click', exportToExcel);
+    document.getElementById('resetOrdersBtn').addEventListener('click', resetAllOrders);
+
+    // Init
+    (async function init() {
+        try {
+            await chargerCadencier();
+            chargerCommandes();
+            setMode('classic');
+        } catch (err) {
+            showError('Erreur cadencier : ' + err.message);
+        }
+    })();
+})();
+</script>
+</body>
+</html>

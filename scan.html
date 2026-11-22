@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scanner BOTAKI - Simple</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+:root{
+    --blue:#0057b8;
+    --yellow:#ffd100;
+}
+body{
+    margin:0;
+    font-family:system-ui;
+    background:#f4f6fb;
+}
+.header{
+    background:linear-gradient(135deg,var(--blue),#003d82);
+    color:white;
+    padding:15px;
+    text-align:center;
+    font-weight:bold;
+}
+.container{
+    max-width:900px;
+    margin:auto;
+    padding:15px;
+}
+.card{
+    background:white;
+    border-radius:20px;
+    padding:15px;
+    box-shadow:0 10px 25px rgba(0,0,0,0.1);
+    margin-bottom:15px;
+}
+#reader{
+    width:100%;
+    border-radius:15px;
+    overflow:hidden;
+    background:black;
+    min-height:300px;
+}
+.buttons{
+    margin-top:10px;
+    text-align:center;
+}
+button{
+    padding:10px 20px;
+    border:none;
+    border-radius:20px;
+    font-weight:bold;
+    cursor:pointer;
+    background:var(--yellow);
+}
+.last-scan{
+    font-size:1.2rem;
+    font-weight:bold;
+    text-align:center;
+    background:#eef2ff;
+    padding:10px;
+    border-radius:10px;
+}
+</style>
+</head>
+<body>
+
+<div class="header">📷 Scanner BOTAKI</div>
+
+<div class="container">
+    <div class="card">
+        <div id="reader"></div>
+        <div class="buttons">
+            <button id="flashBtn">⚡ Flash</button>
+        </div>
+    </div>
+    <div class="card">
+        <div class="last-scan">
+            Dernier scan : <span id="lastScan">---</span>
+        </div>
+    </div>
+</div>
+
+<script>
+let html5QrCode;
+let isScanning = false;
+let lastScan = "";
+let flashOn = false;
+const beep = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
+
+async function startScanner() {
+    try {
+        if (!html5QrCode) {
+            html5QrCode = new Html5Qrcode("reader");
+        }
+        if (isScanning) {
+            await html5QrCode.stop();
+        }
+        await html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 15, qrbox: { width: 250, height: 180 } },
+            onScanSuccess
+        );
+        isScanning = true;
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+async function onScanSuccess(text) {
+    if (text === lastScan) return;
+    lastScan = text;
+    document.getElementById("lastScan").textContent = text;
+
+    try {
+        beep.currentTime = 0;
+        beep.play();
+    } catch(e) {}
+
+    if (html5QrCode && isScanning) {
+        await html5QrCode.stop();
+        isScanning = false;
+    }
+
+    localStorage.setItem('scannedCode', text);
+    setTimeout(() => { window.close(); }, 800);
+}
+
+document.getElementById("flashBtn").onclick = async () => {
+    try {
+        flashOn = !flashOn;
+        await html5QrCode.applyVideoConstraints({
+            advanced: [{ torch: flashOn }]
+        });
+    } catch(e) {
+        alert("Flash non supporté");
+    }
+};
+
+startScanner();
+</script>
+</body>
+</html>
