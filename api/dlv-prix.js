@@ -1,7 +1,7 @@
 import ExcelJS from 'exceljs';
 
-const REPO_OWNER = 'Finoana123';
-const REPO_NAME = 'Dlv';
+const REPO_OWNER = 'Tolotra4023';
+const REPO_NAME = 'CR4';
 const VALID_FOLDERS = ['KIBO4', 'KIBO2'];
 const VALID_SHEETS = ['Épicerie', 'Boisson', 'DPH'];
 
