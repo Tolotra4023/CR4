@@ -233,7 +233,7 @@ async function putFileToGitHub(token, path, contentBase64, sha, message) {
         const detail = err.message || resp.statusText || 'Erreur écriture GitHub';
         // Messages plus clairs
         if (resp.status === 404) {
-            throw new Error('Dépôt ou fichier introuvable (404). Vérifiez REPO Finoana123/Dlv et le token GITHUB_TOKEN.');
+            throw new Error('Dépôt ou fichier introuvable (404). Vérifiez REPO Tolotra4023/CR4 et le token GITHUB_TOKEN.');
         }
         if (resp.status === 401 || resp.status === 403) {
             throw new Error('Token GitHub refusé (' + resp.status + '). Vérifiez GITHUB_TOKEN sur Vercel (droit repo).');

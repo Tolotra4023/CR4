@@ -145,7 +145,7 @@ export default async function handler(req, res) {
         const token = process.env.GITHUB_TOKEN;
         if (!token) return res.status(500).json({ error: 'Token GitHub manquant' });
 
-        const repoOwner = 'Finoana123', repoName = 'Dlv', filePath = fileName;
+        const repoOwner = 'Tolotra4023', repoName = 'CR4', filePath = fileName;
         const targetColumns = FILE_STRUCTURE[fileName];
         if (!targetColumns) return res.status(400).json({ error: 'Fichier inconnu' });
 
