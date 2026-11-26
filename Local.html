@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>BOTAKI - Commande locale</title>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <script>
+    // Fallback si cdn.sheetjs échoue
+    if (typeof XLSX === 'undefined') {
+        document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"><\/script>');
+    }
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
@@ -228,10 +234,27 @@
         return mode === 'pro' ? STORAGE_KEY_PRO : STORAGE_KEY_CLASSIC;
     }
 
-    function showError(msg) {
+    function showError(msg, persistent) {
+        if (!msg) {
+            errorMsgDiv.classList.add('hidden');
+            errorMsgDiv.innerText = '';
+            return;
+        }
         errorMsgDiv.innerText = msg;
         errorMsgDiv.classList.remove('hidden');
-        setTimeout(() => errorMsgDiv.classList.add('hidden'), 5000);
+        if (!persistent) {
+            setTimeout(() => errorMsgDiv.classList.add('hidden'), 8000);
+        }
+    }
+
+    function showInfo(msg) {
+        errorMsgDiv.style.background = '#dbeafe';
+        errorMsgDiv.style.color = '#1e3a8a';
+        showError(msg, true);
+        setTimeout(() => {
+            errorMsgDiv.style.background = '';
+            errorMsgDiv.style.color = '';
+        }, 100);
     }
 
     function sauvegarderCommandes() {
@@ -280,9 +303,15 @@
 
     // ---------- CADENCIER ----------
     async function chargerCadencier() {
-        const response = await fetch(EXCEL_URL, { cache: 'no-store' });
-        if (!response.ok) throw new Error('CADENCIER.xlsx introuvable');
+        if (typeof XLSX === 'undefined') {
+            throw new Error('Librairie Excel (XLSX) non chargée. Vérifiez la connexion internet.');
+        }
+        const response = await fetch(EXCEL_URL + '?t=' + Date.now(), { cache: 'no-store' });
+        if (!response.ok) throw new Error('CADENCIER.xlsx introuvable (HTTP ' + response.status + ')');
         const arrayBuffer = await response.arrayBuffer();
+        if (!arrayBuffer || arrayBuffer.byteLength < 100) {
+            throw new Error('Fichier CADENCIER vide ou corrompu (' + (arrayBuffer ? arrayBuffer.byteLength : 0) + ' octets)');
+        }
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
@@ -314,6 +343,9 @@
             if (codeArticle) cadencierByCode[codeArticle] = item;
         }
         allRows = produits;
+        if (!produits.length) {
+            throw new Error('Aucun produit lu dans CADENCIER.xlsx (vérifiez les colonnes Code article / Désignation)');
+        }
         return produits;
     }
 
@@ -904,11 +936,16 @@ Choisissez un magasin K1–K5.');
     // Init
     (async function init() {
         try {
+            showError('⏳ Chargement du cadencier…', true);
             await chargerCadencier();
             chargerCommandes();
             setMode('classic');
+            showError('✅ Cadencier chargé : ' + allRows.length + ' produits', false);
         } catch (err) {
-            showError('Erreur cadencier : ' + err.message);
+            console.error(err);
+            showError('❌ Erreur cadencier : ' + err.message, true);
+            // Afficher quand même l\'UI (vide) pour pouvoir changer de mode
+            try { setMode('classic'); } catch (_) {}
         }
     })();
 })();
