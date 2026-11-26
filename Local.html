@@ -101,10 +101,7 @@
     <h1 id="mainTitle">BOTAKI - Commande locale</h1>
     <div class="mode-wrap">
         <span class="mode-badge classic" id="modeBadge">Mode : Classique</span>
-        <div class="mode-switch" id="modeSwitch">
-            <button type="button" class="mode-opt selected" data-mode="classic" id="optClassic">Classique</button>
-            <button type="button" class="mode-opt" data-mode="pro" id="optPro">Professionnel</button>
-        </div>
+        <p style="font-size:0.7rem;color:#64748b;margin:4px 0 0;">Astuce : triple-clic sur l’écran → mode Professionnel</p>
     </div>
 
     <div id="errorMsg" class="error-msg hidden"></div>
@@ -183,7 +180,7 @@
             <tbody id="cartBody"><tr><td colspan="6">Aucune commande</td></tr></tbody>
         </table>
     </div>
-    <footer id="pageFooter">⚡ Mode classique · Utilisez les boutons Classique / Professionnel</footer>
+    <footer id="pageFooter">⚡ Mode classique · Triple-clic sur l’écran pour le mode Professionnel</footer>
 </div>
 <div id="saveStatus" class="save-status">💾 Sauvegardé</div>
 
@@ -510,13 +507,12 @@
     function setMode(newMode) {
         mode = newMode;
         chargerCommandes();
-        if (typeof updateModeButtons === 'function') updateModeButtons();
         if (mode === 'classic') {
             modeBadge.textContent = 'Mode : Classique';
             modeBadge.className = 'mode-badge classic';
             proPanel.classList.remove('show');
             document.getElementById('pageFooter').textContent =
-                '⚡ Mode classique · Utilisez les boutons Classique / Professionnel';
+                '⚡ Mode classique · Triple-clic sur l’écran pour le mode Professionnel';
             tableHead.innerHTML = '<tr><th>Code article</th><th>Désignation</th><th>PCB</th><th>Fournisseur</th></tr>';
             document.getElementById('fournisseurGroup').style.display = '';
             filterArea.style.display = allRows.length ? 'block' : 'none';
@@ -542,26 +538,29 @@
         renderCart();
     }
 
-    // Choix mode : boutons Classique / Professionnel
-    function updateModeButtons() {
-        const c = document.getElementById('optClassic');
-        const pr = document.getElementById('optPro');
-        if (c) c.classList.toggle('selected', mode === 'classic');
-        if (pr) pr.classList.toggle('selected', mode === 'pro');
-    }
+    // Triple-clic n'importe où sur l'écran (sauf champs / boutons)
+    let clickTimes = [];
+    function onTripleActivate(e) {
+        const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+        if (['input', 'button', 'select', 'textarea', 'a', 'label'].includes(tag)) return;
+        if (e.target && e.target.closest && e.target.closest('button, input, select, textarea, a, label, .modal, table')) return;
 
-    document.getElementById('optClassic').addEventListener('click', () => {
-        setMode('classic');
-        updateModeButtons();
-    });
-    document.getElementById('optPro').addEventListener('click', () => {
-        setMode('pro');
-        updateModeButtons();
-    });
-    document.getElementById('backClassicBtn').addEventListener('click', () => {
-        setMode('classic');
-        updateModeButtons();
-    });
+        const now = Date.now();
+        clickTimes.push(now);
+        clickTimes = clickTimes.filter(t => now - t < 1200);
+        if (clickTimes.length >= 3) {
+            clickTimes = [];
+            if (mode === 'classic') {
+                setMode('pro');
+            } else {
+                setMode('classic');
+            }
+        }
+    }
+    document.addEventListener('click', onTripleActivate);
+    document.addEventListener('touchend', onTripleActivate, { passive: true });
+
+    document.getElementById('backClassicBtn').addEventListener('click', () => setMode('classic'));
 
     document.getElementById('stockFileInput').addEventListener('change', async (e) => {
         const file = e.target.files && e.target.files[0];
@@ -577,10 +576,7 @@
                 tableContainer.style.display = 'block';
                 filterTable();
             } else {
-                alert('Stock chargé
-' + (window.__stockColInfo || '') + '
-
-Choisissez un magasin K1–K5.');
+                alert('Stock chargé\n' + (window.__stockColInfo || '') + '\n\nChoisissez un magasin K1–K5.');
             }
         } catch (err) {
             stockRows = [];
